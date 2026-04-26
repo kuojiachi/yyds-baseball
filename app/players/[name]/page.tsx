@@ -48,32 +48,78 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
     ["上次先發", player.lastStart],
     ["預期先發", player.expectedStart],
   ];
-  const basicStats = [
-  ["出賽", player.games],
-  ["打數", player.atBats],
-  ["安打", player.hits],
-  ["二安", player.doubles],
-  ["三安", player.triples],
-  ["全壘打", player.homeRuns],
-  ["打點", player.rbi],
-  ["得分", player.runs],
-  ["四壞", player.walks],
-  ["三振", player.strikeouts],
-  ["盜壘", player.stolenBases],
-];
-const advancedStats = [
-  ["AVG", player.avg],
-  ["OBP", player.obp],
-  ["SLG", player.slg],
-  ["OPS", player.ops],
-  ["OPS+", player.opsPlus],
-  ["ISO", player.iso],
-  ["BABIP", player.babip],
-  ["BB%", player.bbRate],
-  ["K%", player.kRate],
-  ["Whiff%", player.whiffRate],
-  ["wOBA", player.woba],
-];
+
+  const playerType = String(player.type || "")
+    .replace(/\s/g, "")
+    .replace(/　/g, "")
+    .trim();
+
+  const isPitcher =
+    playerType.includes("投手") ||
+    playerType.toLowerCase().includes("pitcher") ||
+    playerType.toLowerCase() === "p";
+
+  const basicStats = isPitcher
+    ? [
+        ["出賽", player.games],
+        ["先發", player.starts],
+        ["勝", player.wins],
+        ["敗", player.losses],
+        ["局數", player.innings],
+        ["面對打者", player.battersFaced],
+        ["投球數", player.pitches],
+        ["失分", player.runsAllowed],
+        ["責失", player.earnedRuns],
+        ["被安打", player.hitsAllowed],
+        ["全壘打", player.homeRunsAllowed],
+        ["四壞", player.walksAllowed],
+        ["三振", player.strikeoutsPitching],
+      ]
+    : [
+        ["出賽", player.games],
+        ["打數", player.atBats],
+        ["安打", player.hits],
+        ["二安", player.doubles],
+        ["三安", player.triples],
+        ["全壘打", player.homeRuns],
+        ["打點", player.rbi],
+        ["得分", player.runs],
+        ["四壞", player.walks],
+        ["三振", player.strikeouts],
+        ["盜壘", player.stolenBases],
+      ];
+
+  const advancedStats = isPitcher
+    ? [
+        ["ERA", player.era],
+        ["ERA+", player.eraPlus],
+        ["FIP", player.fip],
+        ["WHIP", player.whip],
+        ["LOB%", player.lobRate],
+        ["BABIP", player.babipAllowed],
+        ["AVG", player.avgAllowed],
+        ["OBP", player.obpAllowed],
+        ["SLG", player.slgAllowed],
+        ["OPS+", player.opsPlusAllowed],
+        ["H9", player.h9],
+        ["HR9", player.hr9],
+        ["BB%", player.bbRatePitching],
+        ["K%", player.kRatePitching],
+        ["Whiff%", player.whiffRate],
+      ]
+    : [
+        ["AVG", player.avg],
+        ["OBP", player.obp],
+        ["SLG", player.slg],
+        ["OPS", player.ops],
+        ["OPS+", player.opsPlus],
+        ["ISO", player.iso],
+        ["BABIP", player.babip],
+        ["BB%", player.bbRate],
+        ["K%", player.kRate],
+        ["Whiff%", player.whiffRate],
+        ["wOBA", player.woba],
+      ];
 
   return (
     <main className="min-h-screen bg-slate-950 text-white p-6">

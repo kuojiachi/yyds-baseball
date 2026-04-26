@@ -19,6 +19,7 @@ export type Player = {
   expectedStart?: string;
   identity?: string;
   note?: string;
+
   games?: string;
   atBats?: string;
   hits?: string;
@@ -42,18 +43,34 @@ export type Player = {
   kRate?: string;
   whiffRate?: string;
   woba?: string;
-};
 
-export type TodayReport = {
-  date: string;
-  name: string;
-  type: string;
-  league: string;
-  team: string;
-  level: string;
-  result: string;
-  opponent: string;
-  stats: string;
+  starts?: string;
+  wins?: string;
+  losses?: string;
+  innings?: string;
+  battersFaced?: string;
+  pitches?: string;
+  runsAllowed?: string;
+  earnedRuns?: string;
+  hitsAllowed?: string;
+  homeRunsAllowed?: string;
+  walksAllowed?: string;
+  strikeoutsPitching?: string;
+
+  era?: string;
+  eraPlus?: string;
+  fip?: string;
+  whip?: string;
+  lobRate?: string;
+  babipAllowed?: string;
+  avgAllowed?: string;
+  obpAllowed?: string;
+  slgAllowed?: string;
+  opsPlusAllowed?: string;
+  h9?: string;
+  hr9?: string;
+  bbRatePitching?: string;
+  kRatePitching?: string;
 };
 
 function valueToString(value: unknown) {
@@ -121,10 +138,48 @@ export async function getPlayersFromExcel(): Promise<Player[]> {
     kRate: getRowValue(row, ["K%", "kRate"]),
     whiffRate: getRowValue(row, ["Whiff%", "whiffRate"]),
     woba: getRowValue(row, ["wOBA", "woba"]),
-      }));
-    }
+    starts: getRowValue(row, ["先發", "GS", "starts"]),
+    wins: getRowValue(row, ["勝", "W", "wins"]),
+    losses: getRowValue(row, ["敗", "L", "losses"]),
+    innings: getRowValue(row, ["局數", "IP", "innings"]),
+    battersFaced: getRowValue(row, ["面對打者", "BF", "battersFaced"]),
+    pitches: getRowValue(row, ["投球數", "Pitches", "NP", "pitches"]),
+    runsAllowed: getRowValue(row, ["失分", "R", "runsAllowed"]),
+    earnedRuns: getRowValue(row, ["責失", "ER", "earnedRuns"]),
+    hitsAllowed: getRowValue(row, ["被安打", "H", "hitsAllowed"]),
+    homeRunsAllowed: getRowValue(row, ["被全壘打", "全壘打", "HR", "homeRunsAllowed"]),
+    walksAllowed: getRowValue(row, ["四壞", "BB", "walksAllowed"]),
+    strikeoutsPitching: getRowValue(row, ["三振", "SO", "K", "strikeoutsPitching"]),
 
-export async function getTodayReportsFromExcel(): Promise<TodayReport[]> {
+    era: getRowValue(row, ["防禦率", "ERA", "era"]),
+    eraPlus: getRowValue(row, ["ERA+", "eraPlus"]),
+    fip: getRowValue(row, ["FIP", "fip"]),
+    whip: getRowValue(row, ["WHIP", "whip"]),
+    lobRate: getRowValue(row, ["LOB%", "lobRate"]),
+    babipAllowed: getRowValue(row, ["被BABIP", "BABIP", "babipAllowed"]),
+    avgAllowed: getRowValue(row, ["被打擊率", "AVG", "avgAllowed"]),
+    obpAllowed: getRowValue(row, ["被上壘率", "OBP", "obpAllowed"]),
+    slgAllowed: getRowValue(row, ["被長打率", "SLG", "slgAllowed"]),
+    opsPlusAllowed: getRowValue(row, ["被OPS+", "OPS+", "opsPlusAllowed"]),
+    h9: getRowValue(row, ["H9", "H/9", "h9"]),
+    hr9: getRowValue(row, ["HR9", "HR/9", "hr9"]),
+    bbRatePitching: getRowValue(row, ["BB%", "bbRatePitching"]),
+    kRatePitching: getRowValue(row, ["K%", "kRatePitching"]),
+  }));
+}
+
+  export type TodayReport = {
+    date: string;
+    name: string;
+    type: string;
+    league: string;
+    team: string;
+    level: string;
+    result: string;
+    opponent: string;
+    stats: string;
+  };
+  export async function getTodayReportsFromExcel(): Promise<TodayReport[]> {
   const workbook = await getExcelWorkbook();
   const sheet =
     workbook.Sheets["今日戰報"] ||
