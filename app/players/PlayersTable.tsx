@@ -275,11 +275,11 @@ export default function PlayersTable({ players }: PlayersTableProps) {
           </p>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1150px] border-separate border-spacing-0 text-sm whitespace-nowrap">
-            <thead className="text-slate-300">
+        <div className="max-h-[70vh] overflow-auto rounded-2xl border border-slate-700">
+          <table className="w-full min-w-[1100px] text-sm whitespace-nowrap">
+            <thead className="sticky top-0 z-30 bg-slate-800 text-slate-300">
               <tr>
-                <th className="sticky left-0 top-0 z-[70] bg-slate-800 text-left p-3 shadow-[4px_0_8px_rgba(0,0,0,0.35)] border-r border-slate-700">
+                <th className="sticky left-0 top-0 z-40 bg-slate-800 p-3 text-left border-r border-slate-700">
                   球員
                 </th>
                 <th className="sticky top-0 z-[60] bg-slate-800 text-left p-3">
@@ -320,8 +320,8 @@ export default function PlayersTable({ players }: PlayersTableProps) {
                     key={`${name}-${index}`}
                     className="border-t border-slate-800 hover:bg-slate-800/60"
                   >
-                    <td className="sticky left-0 z-10 bg-slate-900 p-3 font-medium shadow-[4px_0_8px_rgba(0,0,0,0.35)] border-r border-slate-800">
-                      {name}
+                    <td className="sticky left-0 z-20 bg-slate-900 p-3 text-left font-medium border-r border-slate-800">
+                      {String(player.name ?? "-")}
                     </td>
 
                     <td className="p-3">{String(player.type ?? "-")}</td>
