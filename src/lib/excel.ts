@@ -1,7 +1,8 @@
-import * as XLSX from "xlsx";
-import path from "path";
-import fs from "fs/promises";
+import "server-only";
 
+import * as XLSX from "xlsx";
+import path from "node:path";
+import { readFile } from "node:fs/promises";
 type ExcelCellValue = string | number | boolean | null | undefined;
 
 type ExcelRow = Record<string, ExcelCellValue>;
@@ -48,8 +49,8 @@ function getRowValue(row: Record<string, unknown>, possibleKeys: string[]) {
 }
 
 export async function getExcelWorkbook() {
-  const filePath = path.join(process.cwd(), "public", "data", "yyds.xlsx");
-  const fileBuffer = await fs.readFile(filePath);
+  const filePath = path.join(process.cwd(), "data", "yyds.xlsx");
+  const fileBuffer = await readFile(filePath);
 
   return XLSX.read(fileBuffer, { type: "buffer" });
 }
@@ -149,17 +150,17 @@ export async function getTodayReportsFromExcel(): Promise<TodayReport[]> {
   });
 }
 
-export async function getTodayReports(): Promise<TodayReport[]> {
+export async function getTodayReports(): Promise<ExcelRow[]> {
   const workbook = await getExcelWorkbook();
 
   const sheet = workbook.Sheets["今日戰報"];
   if (!sheet) return [];
 
-  const rows = XLSX.utils.sheet_to_json<TodayReport>(sheet, {
+  const rows = XLSX.utils.sheet_to_json<ExcelRow>(sheet, {
     defval: "",
   });
 
-  return rows.filter((row: ExcelRow) => {
+  return rows.filter((row) => {
     const todayResult =
       row["今日成績"] ||
       row["成績"] ||

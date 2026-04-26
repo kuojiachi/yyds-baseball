@@ -165,11 +165,11 @@ export default async function Home() {
               <table className="w-full min-w-[680px] text-sm whitespace-nowrap">
                 <thead className="sticky top-0 z-30 bg-slate-800 text-slate-300">
                   <tr>
-                    <th className="sticky left-0 z-40 bg-slate-800 text-left p-3 min-w-[140px] shadow-[4px_0_8px_rgba(0,0,0,0.35)] border-r border-slate-700">
+                    <th className="sticky left-0 z-40 bg-slate-800 text-left p-3 w-[140px] min-w-[140px] shadow-[4px_0_8px_rgba(0,0,0,0.35)] border-r border-slate-700">
                       球員
                     </th>
-                    <th className="text-left p-3">球隊</th>
-                    <th className="text-center p-3">層級</th>
+                    <th className="text-left p-3 w-[140px] min-w-[140px]">球隊</th>
+                    <th className="text-center p-3 w-[80px] min-w-[80px]">層級</th>
                     <th className="text-center p-3">異動</th>
                     <th className="text-center p-3">狀態</th>
                   </tr>
@@ -181,16 +181,24 @@ export default async function Home() {
                       key={`${player.name}-${index}`}
                       className="border-t border-slate-800 hover:bg-slate-800/60"
                     >
-                      <td className="sticky left-0 z-10 bg-slate-900 p-3 text-left font-medium min-w-[140px] shadow-[4px_0_8px_rgba(0,0,0,0.35)] border-r border-slate-800">
+                      <td className="sticky left-0 z-10 bg-slate-900 p-3 text-left font-medium w-[140px] min-w-[140px] shadow-[4px_0_8px_rgba(0,0,0,0.35)] border-r border-slate-800">
                         {String(player.name ?? "-")}
                       </td>
-                      <td className="p-3 text-left">{String(player.team ?? "-")}</td>
-                      <td className="p-3 text-center">{String(player.level ?? "-")}</td>
+
+                      <td className="p-3 text-left w-[140px] min-w-[140px]">
+                        {String(player.team ?? "-")}
+                      </td>
+
+                      <td className="p-3 text-center w-[80px] min-w-[80px]">
+                        {String(player.level ?? "-")}
+                      </td>
+
                       <td className="p-3 text-center">
                         <span className={getMovementClass(String(player.movement ?? ""))}>
                           {String(player.movement ?? "-")}
                         </span>
                       </td>
+
                       <td className="p-3 text-center">
                         <span className={getStatusClass(String(player.note ?? player.status ?? ""))}>
                           {String(player.note ?? player.status ?? "-")}
@@ -216,13 +224,13 @@ export default async function Home() {
               <table className="w-full min-w-[620px] text-sm whitespace-nowrap">
                 <thead className="sticky top-0 z-30 bg-slate-800 text-slate-300">
                   <tr>
-                    <th className="sticky left-0 z-40 bg-slate-800 text-left p-3 min-w-[140px] shadow-[4px_0_8px_rgba(0,0,0,0.35)] border-r border-slate-700">
+                    <th className="sticky left-0 z-40 bg-slate-800 text-left p-3 w-[140px] min-w-[140px] shadow-[4px_0_8px_rgba(0,0,0,0.35)] border-r border-slate-700">
                       球員
                     </th>
-                    <th className="text-left p-3">球隊</th>
-                    <th className="text-center p-3">層級</th>
-                    <th className="text-left p-3">對手</th>
-                    <th className="text-left p-3">成績</th>
+                    <th className="text-left p-3 w-[140px] min-w-[140px]">球隊</th>
+                    <th className="text-center p-3 w-[80px] min-w-[80px]">層級</th>
+                    <th className="text-left p-3 w-[140px] min-w-[140px]">對手</th>
+                    <th className="text-left p-3 w-[140px] min-w-[140px]">成績</th>
                   </tr>
                 </thead>
 
@@ -232,11 +240,11 @@ export default async function Home() {
                       key={`${report.name}-${index}`}
                       className="border-t border-slate-800 hover:bg-slate-800/60"
                     >
-                      <td className="sticky left-0 z-10 bg-slate-900 p-3 text-left font-medium min-w-[140px] shadow-[4px_0_8px_rgba(0,0,0,0.35)] border-r border-slate-800">
+                      <td className="sticky left-0 z-10 bg-slate-900 p-3 text-left font-medium w-[140px] min-w-[140px] shadow-[4px_0_8px_rgba(0,0,0,0.35)] border-r border-slate-800">
                         {String(report.name ?? "-")}
                       </td>
-                      <td className="p-3 text-left">{String(report.team ?? "-")}</td>
-                      <td className="p-3 text-center">{String(report.level ?? "-")}</td>
+                      <td className="p-3 text-left w-[140px] min-w-[140px]">{String(report.team ?? "-")}</td>
+                      <td className="p-3 text-center w-[80px] min-w-[80px]">{String(report.level ?? "-")}</td>
                       <td className="p-3 text-left whitespace-nowrap">
                         {String(report.opponent ?? "-")}
                       </td>
