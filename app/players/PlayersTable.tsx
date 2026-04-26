@@ -275,7 +275,8 @@ export default function PlayersTable({ players }: PlayersTableProps) {
           </p>
         </div>
 
-        <div className="max-h-[calc(100vh-260px)] overflow-auto">
+      <div className="overflow-x-auto overscroll-x-contain">
+        <div className="max-h-[calc(100vh-260px)] overflow-y-auto overscroll-y-contain touch-pan-y">
           <table className="min-w-[1100px] w-full border-separate border-spacing-0 text-sm whitespace-nowrap">
             <thead className="sticky top-0 z-50 bg-slate-800 text-slate-300">
               <tr>
@@ -309,7 +310,12 @@ export default function PlayersTable({ players }: PlayersTableProps) {
                     </td>
 
                     <td className="p-3">{String(player.type ?? "-")}</td>
-                    <td className="p-3">{String(player.league ?? "-")}</td>
+                    <td className="p-3">
+                      {String(player.league ?? "-")
+                        .replace("旅美", "美職")
+                        .replace("旅日", "日職")
+                        .replace("旅韓", "韓職")}
+                    </td>
                     <td className="p-3">{String(player.team ?? "-")}</td>
                     <td className="p-3">{String(player.level ?? "-")}</td>
 
@@ -328,10 +334,11 @@ export default function PlayersTable({ players }: PlayersTableProps) {
                     <td className="p-3">{String(player.lastStart ?? "-")}</td>
                     <td className="p-3">{String(player.expectedStart ?? "-")}</td>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </>
