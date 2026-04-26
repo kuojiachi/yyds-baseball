@@ -114,7 +114,7 @@ export default async function Home() {
   });
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white p-6">
+    <main className="min-h-screen bg-slate-950 text-white px-6 pt-3 pb-6">
       <section className="w-full max-w-7xl mx-auto">
 
         <SiteHeader

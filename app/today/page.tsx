@@ -15,7 +15,7 @@ export default async function TodayPage() {
   const playerNameOptions = getPlayerNameOptions(players);
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white p-6">
+    <main className="min-h-screen bg-slate-950 text-white px-6 pt-3 pb-6">
       <section className="max-w-7xl mx-auto">
         <SiteHeader
           subtitle="台灣旅外球員追蹤系統"
@@ -24,8 +24,7 @@ export default async function TodayPage() {
         />
 
         <div className="mb-6">
-          <h2 className="text-3xl font-bold mb-2">今日出賽</h2>
-          <p className="text-slate-300">今日戰報數：{todayPlayers.length}</p>
+          <h2 className="text-3xl font-bold">今日出賽</h2>
         </div>
 
         <Suspense

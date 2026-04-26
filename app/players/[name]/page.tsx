@@ -193,12 +193,15 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
   const decodedName = decodeURIComponent(name);
 
   const players = await getPlayersFromExcel();
-  const player = players.find((item) => item.name === decodedName);
-  const playerNameOptions = getPlayerNameOptions(players);
 
-  if (!player) {
+  const player = players.find((item) => {
+    return item.id === decodedName || item.name === decodedName;
+  });
+
+  const playerNameOptions = getPlayerNameOptions(players);
+    if (!player) {
     return (
-      <main className="min-h-screen bg-slate-950 text-white p-6">
+      <main className="min-h-screen bg-slate-950 text-white px-6 pt-3 pb-6">
         <section className="w-full max-w-5xl mx-auto">
           <SiteHeader
             subtitle="球員個人頁"
@@ -221,7 +224,7 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
     ["球隊", player.team],
     ["層級", player.level],
     ["升降", player.movement],
-    ["狀態異動", player.note || player.status],
+    ["狀態異動", player.note],
     ["上次先發", player.lastStart],
     ["預期先發", player.expectedStart],
   ];
@@ -231,7 +234,7 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
   const playerRole = isPitcher(player) ? "投手" : "野手";
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white p-6">
+    <main className="min-h-screen bg-slate-950 text-white px-6 pt-3 pb-6">
       <section className="w-full max-w-5xl mx-auto">
         <SiteHeader
           subtitle="球員個人頁"

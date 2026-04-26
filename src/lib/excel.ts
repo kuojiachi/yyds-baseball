@@ -9,12 +9,19 @@ type ExcelRow = Record<string, ExcelCellValue>;
 
 export type Player = {
   name: string;
+  id?: string;
   type: string;
   league: string;
+  country?: string;
   team: string;
   level: string;
   movement: string;
   status: string;
+  statusLabel?: string;
+  source?: string;
+  statusSort?: string;
+  eventFlag?: string;
+  eventSort?: string;
   lastStart?: string;
   expectedStart?: string;
   identity?: string;
@@ -76,6 +83,7 @@ export type Player = {
 export type TodayReport = {
   date: string;
   name: string;
+  id?: string;
   type: string;
   league: string;
   team: string;
@@ -110,19 +118,33 @@ function normalizeLeague(category: string): string {
 }
 
 export async function getExcelWorkbook() {
-  const filePath = path.join(process.cwd(), "data", "yyds.xlsx");
-  const fileBuffer = await readFile(filePath);
+  try {
+    const filePath = path.join(process.cwd(), "data", "yyds.xlsx");
+    const fileBuffer = await readFile(filePath);
 
-  return XLSX.read(fileBuffer, { type: "buffer" });
+    return XLSX.read(fileBuffer, { type: "buffer" });
+  } catch (error) {
+    console.error("讀取 Excel 失敗：", error);
+    return null;
+  }
 }
 
 export async function getPlayersFromExcel(): Promise<Player[]> {
   const workbook = await getExcelWorkbook();
 
+  if (!workbook) {
+    return [];
+  }
+
   const sheet =
     workbook.Sheets["總表"] ||
     workbook.Sheets["球員總表"] ||
     workbook.Sheets["players"];
+
+  if (!sheet) {
+    console.error("找不到 Excel 工作表：總表 / 球員總表 / players");
+    return [];
+  }
 
   if (!sheet) return [];
 
@@ -133,6 +155,7 @@ export async function getPlayersFromExcel(): Promise<Player[]> {
   return rows
     .map((row) => ({
       name: getRowValue(row, ["球員", "姓名", "name"]),
+      id: getRowValue(row, ["球員ID", "playerId", "id"]),
       type: getRowValue(row, [
         "守位",
         "位置",
@@ -142,10 +165,16 @@ export async function getPlayersFromExcel(): Promise<Player[]> {
         "type",
       ]),
       league: getRowValue(row, ["分類", "聯盟", "league"]),
+      country: getRowValue(row, ["國家", "country"]),
       team: getRowValue(row, ["球隊", "team"]),
       level: getRowValue(row, ["層級", "等級", "level"]),
       movement: getRowValue(row, ["升降", "異動", "movement"]),
       status: getRowValue(row, ["狀態", "status"]),
+      statusLabel: getRowValue(row, ["狀態標籤", "狀態顯示", "statusLabel"]),
+      source: getRowValue(row, ["異動源", "source"]),
+      statusSort: getRowValue(row, ["狀態排序", "狀態序", "statusSort"]),
+      eventFlag: getRowValue(row, ["事件標籤", "事件旗標", "eventFlag"]),
+      eventSort: getRowValue(row, ["事件排序", "事件序", "eventSort"]),
       lastStart: getRowValue(row, ["上次先發", "lastStart"]),
       expectedStart: getRowValue(row, ["預期先發", "expectedStart"]),
       identity: getRowValue(row, ["身分", "identity"]),
@@ -219,9 +248,16 @@ export async function getPlayersFromExcel(): Promise<Player[]> {
 export async function getTodayReportsFromExcel(): Promise<TodayReport[]> {
   const workbook = await getExcelWorkbook();
 
+  if (!workbook) {
+    return [];
+  }
+
   const sheet = workbook.Sheets["今日戰報"] || workbook.Sheets["今日出賽"];
 
-  if (!sheet) return [];
+  if (!sheet) {
+    console.error("找不到 Excel 工作表：今日戰報 / 今日出賽");
+    return [];
+  }
 
   const rows = XLSX.utils.sheet_to_json<ExcelCellValue[]>(sheet, {
     header: 1,
@@ -232,10 +268,13 @@ export async function getTodayReportsFromExcel(): Promise<TodayReport[]> {
     const firstCell = valueToString(row[0]);
     const secondCell = valueToString(row[1]);
 
-    return firstCell === "球員" || firstCell === "日期" || secondCell === "球員";
+    return firstCell === "日期" || firstCell === "球員" || secondCell === "球員";
   });
 
-  if (headerRowIndex === -1) return [];
+  if (headerRowIndex === -1) {
+    console.error("今日戰報找不到標題列，請確認有 日期 / 球員 欄位");
+    return [];
+  }
 
   const headerRow = rows[headerRowIndex];
 
@@ -249,17 +288,19 @@ export async function getTodayReportsFromExcel(): Promise<TodayReport[]> {
     .map((row) => {
       const date = hasDateColumn ? valueToString(row[0]) : "";
       const name = hasDateColumn ? valueToString(row[1]) : valueToString(row[0]);
-      const category = hasDateColumn ? valueToString(row[2]) : valueToString(row[1]);
-      const level = hasDateColumn ? valueToString(row[3]) : valueToString(row[2]);
-      const position = hasDateColumn ? valueToString(row[4]) : valueToString(row[3]);
-      const team = hasDateColumn ? valueToString(row[5]) : valueToString(row[4]);
-      const result = hasDateColumn ? valueToString(row[6]) : valueToString(row[5]);
-      const opponent = hasDateColumn ? valueToString(row[7]) : valueToString(row[6]);
-      const stats = hasDateColumn ? valueToString(row[8]) : valueToString(row[7]);
+      const id = hasDateColumn ? valueToString(row[2]) : "";
+      const category = hasDateColumn ? valueToString(row[3]) : valueToString(row[1]);
+      const level = hasDateColumn ? valueToString(row[4]) : valueToString(row[2]);
+      const position = hasDateColumn ? valueToString(row[5]) : valueToString(row[3]);
+      const team = hasDateColumn ? valueToString(row[6]) : valueToString(row[4]);
+      const result = hasDateColumn ? valueToString(row[7]) : valueToString(row[5]);
+      const opponent = hasDateColumn ? valueToString(row[8]) : valueToString(row[6]);
+      const stats = hasDateColumn ? valueToString(row[9]) : valueToString(row[7]);
 
       return {
         date,
         name,
+        id,
         type: position,
         league: normalizeLeague(category),
         team,

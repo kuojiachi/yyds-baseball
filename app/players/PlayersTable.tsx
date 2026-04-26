@@ -272,14 +272,12 @@ export default function PlayersTable({ players }: PlayersTableProps) {
 
   return (
     <>
-      <div className="bg-slate-900 rounded-2xl border border-slate-800 mb-6 p-5">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
-          <div>
-            <h2 className="text-xl font-bold">篩選條件</h2>
-            <p className="text-slate-400 text-sm mt-1">
-              可搜尋球員、球隊、層級、分類、守位
-            </p>
-          </div>
+      <details className="bg-slate-900 rounded-2xl border border-slate-800 mb-6 p-5">
+        <summary className="list-none cursor-pointer">
+          篩選條件
+        </summary>
+
+        <div className="mt-5">
 
           <div className="flex flex-col sm:flex-row gap-3">
             <button
@@ -354,7 +352,7 @@ export default function PlayersTable({ players }: PlayersTableProps) {
             }}
           />
         </div>
-      </div>
+      </details>
 
       <div className="bg-slate-900 rounded-2xl border border-slate-700 shadow-xl shadow-black/30">
         <div className="p-5 border-b border-slate-800">
@@ -406,7 +404,7 @@ export default function PlayersTable({ players }: PlayersTableProps) {
                     >
                       <td className="sticky left-0 z-30 bg-slate-900 p-3 text-left font-medium border-r border-slate-800">
                         <Link
-                          href={`/players/${encodeURIComponent(name)}`}
+                          href={`/players/${encodeURIComponent(player.id || name)}`}
                           className="text-sky-300 hover:text-sky-200 hover:underline"
                         >
                           {name}

@@ -17,12 +17,12 @@ export async function GET(request: Request) {
   const players = await getPlayersFromExcel();
 
   const exactMatch = players.find((player) => {
-    return normalizeText(player.name) === q;
+    return normalizeText(player.name) === q || normalizeText(player.id) === q;
   });
 
   if (exactMatch) {
     return NextResponse.redirect(
-      `${origin}/players/${encodeURIComponent(exactMatch.name)}`
+      `${origin}/players/${encodeURIComponent(exactMatch.id || exactMatch.name)}`
     );
   }
 
