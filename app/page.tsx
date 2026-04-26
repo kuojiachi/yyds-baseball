@@ -1,3 +1,5 @@
+import SiteHeader from "@/src/components/SiteHeader";
+import { getPlayerNameOptions } from "@/src/utils/playerNameOptions";
 import { getPlayersFromExcel, getTodayReportsFromExcel } from "@/src/lib/excel";
 import Link from "next/link";
 import { getMovementClass, getStatusClass } from "@/src/utils/playerStyles";
@@ -5,6 +7,7 @@ import { getMovementClass, getStatusClass } from "@/src/utils/playerStyles";
 export default async function Home() {
   const players = await getPlayersFromExcel();
   const todayReports = await getTodayReportsFromExcel();
+  const playerNameOptions = getPlayerNameOptions(players);
 
   const movedPlayers = players.filter((player) => {
     const movement = String(player.movement || "").trim();
@@ -113,10 +116,12 @@ export default async function Home() {
   return (
     <main className="min-h-screen bg-slate-950 text-white p-6">
       <section className="w-full max-w-7xl mx-auto">
-        <h1 className="text-4xl font-bold mb-2">TWDS </h1>
-        <p className="text-slate-300 mb-8">
-          台灣旅外球員追蹤系統
-        </p>
+
+        <SiteHeader
+          subtitle="台灣旅外球員追蹤系統"
+          showSearch
+          playerNameOptions={playerNameOptions}
+        />
 
         <div className="flex flex-col gap-10">
           {/* 第 1 區：三張數字卡 */}

@@ -1,4 +1,5 @@
-import Link from "next/link";
+import SiteHeader from "@/src/components/SiteHeader";
+import { getPlayerNameOptions } from "@/src/utils/playerNameOptions";
 import { getPlayersFromExcel } from "@/src/lib/excel";
 
 type PlayerPageProps = {
@@ -20,14 +21,16 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
 
   const players = await getPlayersFromExcel();
   const player = players.find((item) => item.name === decodedName);
-
+  const playerNameOptions = getPlayerNameOptions(players);
   if (!player) {
     return (
       <main className="min-h-screen bg-slate-950 text-white p-6">
         <section className="max-w-3xl mx-auto">
-          <Link href="/players" className="text-sky-300 hover:underline">
-            ← 回總表
-          </Link>
+          <SiteHeader
+            subtitle="球員個人頁"
+            showSearch
+            playerNameOptions={playerNameOptions}
+          />
 
           <div className="mt-6 rounded-2xl border border-slate-700 bg-slate-900 p-6">
             <h1 className="text-3xl font-bold">找不到球員</h1>
@@ -124,14 +127,15 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
   return (
     <main className="min-h-screen bg-slate-950 text-white p-6">
       <section className="max-w-3xl mx-auto">
-        <Link href="/players" className="text-sky-300 hover:underline">
-          ← 回總表
-        </Link>
+        <SiteHeader
+          subtitle="球員個人頁"
+          showSearch
+          playerNameOptions={playerNameOptions}
+        />
 
         <div className="mt-6 rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-xl shadow-black/30">
           <h1 className="text-4xl font-bold">{player.name}</h1>
-          <p className="mt-2 text-slate-400">球員個人頁</p>
-
+          
           <div className="mt-6 divide-y divide-slate-800">
             {rows.map(([label, value]) => (
               <div

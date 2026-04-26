@@ -10,7 +10,6 @@ export async function GET(request: Request) {
   }
 
   const players = await getPlayersFromExcel();
-
   const exactMatch = players.find((player) => player.name === q);
 
   if (exactMatch) {
@@ -19,7 +18,5 @@ export async function GET(request: Request) {
     );
   }
 
-  return NextResponse.redirect(
-    `${origin}/players?q=${encodeURIComponent(q)}`
-  );
+  return NextResponse.redirect(`${origin}/players?q=${encodeURIComponent(q)}`);
 }
