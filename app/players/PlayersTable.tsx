@@ -267,7 +267,7 @@ export default function PlayersTable({ players }: PlayersTableProps) {
         </div>
       </div>
 
-      <div className="bg-slate-900 rounded-2xl border border-slate-700 overflow-hidden shadow-xl shadow-black/30">
+      <div className="bg-slate-900 rounded-2xl border border-slate-700 shadow-xl shadow-black/30">
         <div className="p-5 border-b border-slate-800">
           <h2 className="text-xl font-bold">完整追蹤名單</h2>
           <p className="text-slate-400 text-sm mt-1">
@@ -275,37 +275,21 @@ export default function PlayersTable({ players }: PlayersTableProps) {
           </p>
         </div>
 
-        <div className="max-h-[70vh] overflow-auto rounded-2xl border border-slate-700">
-          <table className="w-full min-w-[1100px] text-sm whitespace-nowrap">
-            <thead className="sticky top-0 z-30 bg-slate-800 text-slate-300">
+        <div className="max-h-[calc(100vh-260px)] overflow-auto">
+          <table className="min-w-[1100px] w-full border-separate border-spacing-0 text-sm whitespace-nowrap">
+            <thead className="sticky top-0 z-50 bg-slate-800 text-slate-300">
               <tr>
-                <th className="sticky left-0 top-0 z-40 bg-slate-800 p-3 text-left border-r border-slate-700">
+                <th className="sticky left-0 top-0 z-[70] bg-slate-800 p-3 text-left border-r border-slate-700">
                   球員
                 </th>
-                <th className="sticky top-0 z-[60] bg-slate-800 text-left p-3">
-                  類型
-                </th>
-                <th className="sticky top-0 z-[60] bg-slate-800 text-left p-3">
-                  聯盟
-                </th>
-                <th className="sticky top-0 z-[60] bg-slate-800 text-left p-3">
-                  球隊
-                </th>
-                <th className="sticky top-0 z-[60] bg-slate-800 text-left p-3">
-                  層級
-                </th>
-                <th className="sticky top-0 z-[60] bg-slate-800 text-left p-3">
-                  升降
-                </th>
-                <th className="sticky top-0 z-[60] bg-slate-800 text-left p-3">
-                  狀態異動
-                </th>
-                <th className="sticky top-0 z-[60] bg-slate-800 text-left p-3">
-                  上次先發
-                </th>
-                <th className="sticky top-0 z-[60] bg-slate-800 text-left p-3">
-                  預期先發
-                </th>
+                <th className="bg-slate-800 p-3 text-left">類型</th>
+                <th className="bg-slate-800 p-3 text-left">聯盟</th>
+                <th className="bg-slate-800 p-3 text-left">球隊</th>
+                <th className="bg-slate-800 p-3 text-left">層級</th>
+                <th className="bg-slate-800 p-3 text-left">升降</th>
+                <th className="bg-slate-800 p-3 text-left">狀態異動</th>
+                <th className="bg-slate-800 p-3 text-left">上次先發</th>
+                <th className="bg-slate-800 p-3 text-left">預期先發</th>
               </tr>
             </thead>
 
@@ -320,7 +304,7 @@ export default function PlayersTable({ players }: PlayersTableProps) {
                     key={`${name}-${index}`}
                     className="border-t border-slate-800 hover:bg-slate-800/60"
                   >
-                    <td className="sticky left-0 z-20 bg-slate-900 p-3 text-left font-medium border-r border-slate-800">
+                    <td className="sticky left-0 z-30 bg-slate-900 p-3 text-left font-medium border-r border-slate-800">
                       {String(player.name ?? "-")}
                     </td>
 
