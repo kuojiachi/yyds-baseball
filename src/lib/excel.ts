@@ -19,6 +19,29 @@ export type Player = {
   expectedStart?: string;
   identity?: string;
   note?: string;
+  games?: string;
+  atBats?: string;
+  hits?: string;
+  doubles?: string;
+  triples?: string;
+  homeRuns?: string;
+  rbi?: string;
+  runs?: string;
+  walks?: string;
+  strikeouts?: string;
+  stolenBases?: string;
+
+  avg?: string;
+  obp?: string;
+  slg?: string;
+  ops?: string;
+  opsPlus?: string;
+  iso?: string;
+  babip?: string;
+  bbRate?: string;
+  kRate?: string;
+  whiffRate?: string;
+  woba?: string;
 };
 
 export type TodayReport = {
@@ -75,8 +98,31 @@ export async function getPlayersFromExcel(): Promise<Player[]> {
     expectedStart: getRowValue(row, ["預期先發", "expectedStart"]),
     identity: getRowValue(row, ["身分", "identity"]),
     note: getRowValue(row, ["狀態異動", "傷病", "備註", "note"]),
-  }));
-}
+    games: getRowValue(row, ["出賽", "G", "games"]),
+    atBats: getRowValue(row, ["打數", "AB", "atBats"]),
+    hits: getRowValue(row, ["安打", "H", "hits"]),
+    doubles: getRowValue(row, ["二安", "2B", "doubles"]),
+    triples: getRowValue(row, ["三安", "3B", "triples"]),
+    homeRuns: getRowValue(row, ["全壘打", "HR", "homeRuns"]),
+    rbi: getRowValue(row, ["打點", "RBI", "rbi"]),
+    runs: getRowValue(row, ["得分", "R", "runs"]),
+    walks: getRowValue(row, ["四壞", "BB", "walks"]),
+    strikeouts: getRowValue(row, ["三振", "SO", "K", "strikeouts"]),
+    stolenBases: getRowValue(row, ["盜壘", "SB", "stolenBases"]),
+
+    avg: getRowValue(row, ["打擊率", "AVG", "avg"]),
+    obp: getRowValue(row, ["上壘率", "OBP", "obp"]),
+    slg: getRowValue(row, ["長打率", "SLG", "slg"]),
+    ops: getRowValue(row, ["OPS", "ops"]),
+    opsPlus: getRowValue(row, ["OPS+", "opsPlus"]),
+    iso: getRowValue(row, ["ISO", "iso"]),
+    babip: getRowValue(row, ["BABIP", "babip"]),
+    bbRate: getRowValue(row, ["BB%", "bbRate"]),
+    kRate: getRowValue(row, ["K%", "kRate"]),
+    whiffRate: getRowValue(row, ["Whiff%", "whiffRate"]),
+    woba: getRowValue(row, ["wOBA", "woba"]),
+      }));
+    }
 
 export async function getTodayReportsFromExcel(): Promise<TodayReport[]> {
   const workbook = await getExcelWorkbook();

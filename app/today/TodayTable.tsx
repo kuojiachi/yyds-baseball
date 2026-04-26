@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { TodayReport } from "@/src/lib/excel";
@@ -295,7 +296,12 @@ export default function TodayTable({ todayPlayers }: TodayTableProps) {
                   className="border-t border-slate-800 hover:bg-slate-800/60"
                 >
                   <td className="sticky left-0 z-10 bg-slate-900 p-3 font-medium shadow-[4px_0_8px_rgba(0,0,0,0.35)] border-r border-slate-800">
-                    {report.name || "-"}
+                    <Link
+                      href={`/players/${encodeURIComponent(String(report.name ?? ""))}`}
+                      className="text-sky-300 hover:text-sky-200 hover:underline"
+                    >
+                      {String(report.name || "-")}
+                    </Link>
                   </td>
                   <td className="p-3">{report.type || "-"}</td>
                   <td className="p-3">{report.league || "-"}</td>

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { sortPlayersForTable } from "@/src/utils/sortPlayers";
@@ -305,9 +306,14 @@ export default function PlayersTable({ players }: PlayersTableProps) {
                     className="border-t border-slate-800 hover:bg-slate-800/60"
                   >
                     <td className="sticky left-0 z-30 bg-slate-900 p-3 text-left font-medium border-r border-slate-800">
-                      {String(player.name ?? "-")}
+                      <Link
+                        href={`/players/${encodeURIComponent(String(player.name ?? ""))}`}
+                        className="text-sky-300 hover:text-sky-200 hover:underline"
+                      >
+                        {String(player.name ?? "-")}
+                      </Link>
                     </td>
-
+                    
                     <td className="p-3">{String(player.type ?? "-")}</td>
                     <td className="p-3">
                       {String(player.league ?? "-")
