@@ -267,9 +267,7 @@ export default function PlayersTable({ players }: PlayersTableProps) {
         </div>
       </div>
 
-      <div 
-        style={{ marginTop: 40 }}
-        className="bg-slate-900 rounded-2xl border border-slate-800">
+      <div className="bg-slate-900 rounded-2xl border border-slate-700 overflow-hidden shadow-xl shadow-black/30">
         <div className="p-5 border-b border-slate-800">
           <h2 className="text-xl font-bold">完整追蹤名單</h2>
           <p className="text-slate-400 text-sm mt-1">

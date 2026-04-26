@@ -153,9 +153,7 @@ export default async function Home() {
           </div>
 
           {/* 第 2 區：異動球員 */}
-          <div 
-            style={{ marginTop: 40 }}
-            className="mt-10 bg-slate-900 rounded-2xl border border-slate-700 overflow-hidden shadow-xl shadow-black/30">
+          <div className="mt-[40px] bg-slate-900 rounded-2xl border border-slate-700 overflow-hidden shadow-xl shadow-black/30">
             <div className="p-5 border-b border-slate-800">
               <h2 className="text-xl font-bold">異動球員</h2>
               <p className="text-slate-400 text-sm mt-1">
@@ -171,9 +169,9 @@ export default async function Home() {
                       球員
                     </th>
                     <th className="text-left p-3">球隊</th>
-                    <th className="text-left p-3">層級</th>
-                    <th className="text-left p-3">異動</th>
-                    <th className="text-left p-3">狀態</th>
+                    <th className="text-center p-3">層級</th>
+                    <th className="text-center p-3">異動</th>
+                    <th className="text-center p-3">狀態</th>
                   </tr>
                 </thead>
 
@@ -206,9 +204,7 @@ export default async function Home() {
           </div>
 
           {/* 第 3 區：今日戰報 */}
-          <div 
-            style={{ marginTop: 40 }}
-            className="mt-10 bg-slate-900 rounded-2xl border border-slate-700 overflow-hidden shadow-xl shadow-black/30">
+          <div className="bg-slate-900 rounded-2xl border border-slate-700 overflow-hidden shadow-xl shadow-black/30">            
             <div className="p-5 border-b border-slate-800">
               <h2 className="text-xl font-bold">今日戰報｜2A 以上</h2>
               <p className="text-slate-400 text-sm mt-1">
@@ -224,7 +220,7 @@ export default async function Home() {
                       球員
                     </th>
                     <th className="text-left p-3">球隊</th>
-                    <th className="text-left p-3">層級</th>
+                    <th className="text-center p-3">層級</th>
                     <th className="text-left p-3">對手</th>
                     <th className="text-left p-3">成績</th>
                   </tr>
@@ -236,15 +232,15 @@ export default async function Home() {
                       key={`${report.name}-${index}`}
                       className="border-t border-slate-800 hover:bg-slate-800/60"
                     >
-                      <td className="sticky left-0 z-10 bg-slate-900 p-3 text-right font-medium min-w-[140px] shadow-[4px_0_8px_rgba(0,0,0,0.35)] border-r border-slate-800">
+                      <td className="sticky left-0 z-10 bg-slate-900 p-3 text-left font-medium min-w-[140px] shadow-[4px_0_8px_rgba(0,0,0,0.35)] border-r border-slate-800">
                         {String(report.name ?? "-")}
                       </td>
-                      <td className="p-3 text-right">{String(report.team ?? "-")}</td>
-                      <td className="p-3 text-left">{String(report.level ?? "-")}</td>
-                      <td className="p-3 text-right whitespace-nowrap">
+                      <td className="p-3 text-left">{String(report.team ?? "-")}</td>
+                      <td className="p-3 text-center">{String(report.level ?? "-")}</td>
+                      <td className="p-3 text-left whitespace-nowrap">
                         {String(report.opponent ?? "-")}
                       </td>
-                      <td className="p-3 text-right">{String(report.stats ?? "-")}</td>
+                      <td className="p-3 text-left">{String(report.stats ?? "-")}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -253,9 +249,7 @@ export default async function Home() {
           </div>
 
           {/* 第 4 區：美日韓職人數 */}
-          <div 
-            style={{ marginTop: 40 }}
-            className="mt-10 bg-slate-900 rounded-2xl border border-slate-700 overflow-hidden shadow-xl shadow-black/30">
+          <div className="bg-slate-900 rounded-2xl border border-slate-700 overflow-hidden shadow-xl shadow-black/30">
             <div className="p-5 border-b border-slate-800">
               <h2 className="text-xl font-bold">美日韓職人數</h2>
               <p className="text-slate-400 text-sm mt-1">
@@ -313,9 +307,7 @@ export default async function Home() {
           </div>
 
           {/* 第 5 區：各層級人數 */}
-          <div 
-            style={{ marginTop: 40 }}
-            className="mt-10 bg-slate-900 rounded-2xl border border-slate-700 overflow-hidden shadow-xl shadow-black/30">
+          <div className="bg-slate-900 rounded-2xl border border-slate-700 overflow-hidden shadow-xl shadow-black/30">
             <div className="p-5 border-b border-slate-800">
               <h2 className="text-xl font-bold">各層級人數</h2>
               <p className="text-slate-400 text-sm mt-1">
