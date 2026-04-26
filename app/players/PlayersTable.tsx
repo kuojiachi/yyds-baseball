@@ -3,114 +3,226 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { sortPlayersForTable } from "@/src/utils/sortPlayers";
-import { getMovementClass, getStatusClass } from "@/src/utils/playerStyles";
+
 import type { Player } from "@/src/lib/excel";
+import { getMovementClass, getStatusClass } from "@/src/utils/playerStyles";
+import { sortPlayersForTable } from "@/src/utils/sortPlayers";
 
 type PlayersTableProps = {
   players: Player[];
 };
 
+const ALL = "全部";
+
+const TYPE_OPTIONS = [ALL, "投手", "野手"];
+const LEAGUE_OPTIONS = [ALL, "美職", "日職", "韓職", "台裔", "其他"];
+const LEVEL_OPTIONS = [
+  ALL,
+  "MLB",
+  "3A",
+  "2A",
+  "A+",
+  "1A",
+  "RK",
+  "日職一軍",
+  "日職二軍",
+  "韓職一軍",
+];
+const STATUS_OPTIONS = [ALL, "現役", "傷兵", "異動"];
+
+function normalizeText(value: unknown): string {
+  return String(value ?? "").trim();
+}
+
+function normalizeSearchText(value: unknown): string {
+  return normalizeText(value).toLowerCase();
+}
+
+function normalizePlayerType(type: unknown): string {
+  return normalizeText(type).replace(/\s/g, "").replace(/　/g, "");
+}
+
+function normalizeLeague(league: unknown): string {
+  const text = normalizeText(league);
+
+  if (text === "旅美" || text === "MLB" || text === "MiLB") return "美職";
+  if (text === "旅日" || text === "NPB") return "日職";
+  if (text === "旅韓" || text === "KBO") return "韓職";
+
+  return text || "其他";
+}
+
+function hasValue(value: unknown): boolean {
+  const text = normalizeText(value);
+  return text !== "" && text !== "-";
+}
+
+function isPitcher(player: Player): boolean {
+  const type = normalizePlayerType(player.type);
+  const lowerType = type.toLowerCase();
+
+  return (
+    type.includes("投手") ||
+    lowerType.includes("pitcher") ||
+    lowerType === "p"
+  );
+}
+
+function isHitter(player: Player): boolean {
+  const type = normalizePlayerType(player.type);
+  const lowerType = type.toLowerCase();
+
+  return (
+    type.includes("外野手") ||
+    type.includes("內野手") ||
+    type.includes("野手") ||
+    type.includes("捕手") ||
+    type.includes("打者") ||
+    lowerType.includes("hitter") ||
+    lowerType.includes("batter") ||
+    lowerType === "h"
+  );
+}
+
+function matchesSearch(player: Player, keyword: string): boolean {
+  if (!keyword) return true;
+
+  const searchableText = [
+    player.name,
+    player.team,
+    player.level,
+    player.league,
+    player.type,
+    player.status,
+    player.note,
+  ]
+    .map(normalizeSearchText)
+    .join(" ");
+
+  return searchableText.includes(keyword);
+}
+
+function matchesType(player: Player, typeFilter: string): boolean {
+  if (typeFilter === ALL) return true;
+  if (typeFilter === "投手") return isPitcher(player);
+  if (typeFilter === "野手") return isHitter(player);
+
+  return true;
+}
+
+function matchesLeague(player: Player, leagueFilter: string): boolean {
+  if (leagueFilter === ALL) return true;
+
+  return normalizeLeague(player.league) === leagueFilter;
+}
+
+function matchesLevel(player: Player, levelFilter: string): boolean {
+  if (levelFilter === ALL) return true;
+
+  return normalizeText(player.level) === levelFilter;
+}
+
+function matchesStatus(player: Player, statusFilter: string): boolean {
+  if (statusFilter === ALL) return true;
+
+  const status = normalizeText(player.status);
+  const statusText = `${normalizeText(player.status)} ${normalizeText(player.note)}`;
+
+  if (statusFilter === "現役") return status === "現役";
+  if (statusFilter === "傷兵") return statusText.includes("傷");
+  if (statusFilter === "異動") {
+    return hasValue(player.movement) || hasValue(player.note);
+  }
+
+  return true;
+}
+
+function csvEscape(value: unknown): string {
+  return `"${String(value ?? "").replace(/"/g, '""')}"`;
+}
+
+function FilterSelect({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: string[];
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="block">
+      <p className="text-slate-400 text-sm mb-2">{label}</p>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="w-full rounded-xl bg-slate-800 border border-slate-700 p-3 text-white"
+      >
+        {options.map((option) => (
+          <option key={option}>{option}</option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 export default function PlayersTable({ players }: PlayersTableProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [searchText, setSearchText] = useState(
-    searchParams.get("q") || ""
-  );
 
-  const [typeFilter, setTypeFilter] = useState(
-    searchParams.get("type") || "全部"
-  );
+  const [searchText, setSearchText] = useState(searchParams.get("q") || "");
+  const [typeFilter, setTypeFilter] = useState(searchParams.get("type") || ALL);
   const [leagueFilter, setLeagueFilter] = useState(
-    searchParams.get("league") || "全部"
+    searchParams.get("league") || ALL
   );
   const [levelFilter, setLevelFilter] = useState(
-    searchParams.get("level") || "全部"
+    searchParams.get("level") || ALL
   );
   const [statusFilter, setStatusFilter] = useState(
-    searchParams.get("status") || "全部"
+    searchParams.get("status") || ALL
   );
 
   function updateFilter(key: string, value: string) {
     const params = new URLSearchParams(searchParams.toString());
+    const nextValue = value.trim();
 
-  if (value === "全部" || value.trim() === "") {
-    params.delete(key);
-  } else {
-    params.set(key, value);
-  }
+    if (nextValue === "" || nextValue === ALL) {
+      params.delete(key);
+    } else {
+      params.set(key, nextValue);
+    }
 
     const queryString = params.toString();
+
     router.replace(queryString ? `/players?${queryString}` : "/players", {
       scroll: false,
     });
   }
 
+  function clearFilters() {
+    setSearchText("");
+    setTypeFilter(ALL);
+    setLeagueFilter(ALL);
+    setLevelFilter(ALL);
+    setStatusFilter(ALL);
+
+    router.replace("/players", { scroll: false });
+  }
+
   const filteredPlayers = useMemo(() => {
+    const keyword = normalizeSearchText(searchText);
+
     return sortPlayersForTable(
       players.filter((player) => {
-        const keyword = searchText.trim().toLowerCase();
-
-        const matchSearch =
-          keyword === "" ||
-          String(player.name || "").toLowerCase().includes(keyword) ||
-          String(player.team || "").toLowerCase().includes(keyword) ||
-          String(player.level || "").toLowerCase().includes(keyword) ||
-          String(player.league || "").toLowerCase().includes(keyword) ||
-          String(player.type || "").toLowerCase().includes(keyword);
-          
-        const playerType = String(player.type || "")
-          .replace(/\s/g, "")
-          .replace(/　/g, "")
-          .trim();
-
-        const isPitcher =
-          playerType.includes("投手") ||
-          playerType.toLowerCase().includes("pitcher") ||
-          playerType.toLowerCase() === "p";
-
-        const isHitter =
-          playerType.includes("外野手") ||
-          playerType.includes("內野手") ||
-          playerType.includes("野手") ||
-          playerType.includes("捕手") ||
-          playerType.includes("打者") ||
-          playerType.toLowerCase().includes("hitter") ||
-          playerType.toLowerCase().includes("batter") ||
-          playerType.toLowerCase() === "h";
-
-        const matchType =
-          typeFilter === "全部" ||
-          (typeFilter === "投手" && isPitcher) ||
-          (typeFilter === "野手" && isHitter);
-
-        const playerLeague = String(player.league || "").trim();
-
-        const normalizedLeague =
-          playerLeague === "旅美" || playerLeague === "MLB" || playerLeague === "MiLB"
-            ? "美職"
-            : playerLeague === "旅日" || playerLeague === "NPB"
-            ? "日職"
-            : playerLeague === "旅韓" || playerLeague === "KBO"
-            ? "韓職"
-            : playerLeague;
-
-        const matchLeague =
-          leagueFilter === "全部" || normalizedLeague === leagueFilter;
-        const matchLevel =
-          levelFilter === "全部" || player.level === levelFilter;
-
-        const playerStatusText = `${player.status || ""} ${player.note || ""}`;
-
-        const matchStatus =
-          statusFilter === "全部" ||
-          (statusFilter === "現役" && player.status === "現役") ||
-          (statusFilter === "傷兵" && playerStatusText.includes("傷")) ||
-          (statusFilter === "異動" &&
-            ((player.movement && player.movement !== "-") ||
-              (player.note && player.note !== "-")));
-
-        return matchSearch && matchType && matchLeague && matchLevel && matchStatus;
+        return (
+          matchesSearch(player, keyword) &&
+          matchesType(player, typeFilter) &&
+          matchesLeague(player, leagueFilter) &&
+          matchesLevel(player, levelFilter) &&
+          matchesStatus(player, statusFilter)
+        );
       })
     );
   }, [players, searchText, typeFilter, leagueFilter, levelFilter, statusFilter]);
@@ -129,23 +241,19 @@ export default function PlayersTable({ players }: PlayersTableProps) {
     ];
 
     const rows = filteredPlayers.map((player) => [
-      player.name || "",
-      player.type || "",
-      player.league || "",
-      player.team || "",
-      player.level || "",
-      player.movement || "",
-      player.note || player.status || "",
-      player.lastStart || "",
-      player.expectedStart || "",
+      player.name,
+      player.type,
+      normalizeLeague(player.league),
+      player.team,
+      player.level,
+      player.movement,
+      player.note || player.status,
+      player.lastStart,
+      player.expectedStart,
     ]);
 
     const csvContent = [headers, ...rows]
-      .map((row) =>
-        row
-          .map((value) => `"${String(value).replace(/"/g, '""')}"`)
-          .join(",")
-      )
+      .map((row) => row.map(csvEscape).join(","))
       .join("\n");
 
     const blob = new Blob(["\uFEFF" + csvContent], {
@@ -165,19 +273,34 @@ export default function PlayersTable({ players }: PlayersTableProps) {
   return (
     <>
       <div className="bg-slate-900 rounded-2xl border border-slate-800 mb-6 p-5">
-        <div className="flex items-center justify-between gap-4 mb-4">
-          <h2 className="text-xl font-bold">篩選條件</h2>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
+          <div>
+            <h2 className="text-xl font-bold">篩選條件</h2>
+            <p className="text-slate-400 text-sm mt-1">
+              可搜尋球員、球隊、層級、分類、守位
+            </p>
+          </div>
 
-          <button
-            type="button"
-            onClick={exportPlayersCsv}
-            className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-bold text-white hover:bg-sky-500 transition"
-          >
-            匯出目前結果 CSV
-          </button>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="rounded-xl bg-slate-800 px-4 py-2 text-sm font-bold text-white hover:bg-slate-700 transition"
+            >
+              清除篩選
+            </button>
+
+            <button
+              type="button"
+              onClick={exportPlayersCsv}
+              className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-bold text-white hover:bg-sky-500 transition"
+            >
+              匯出目前結果 CSV
+            </button>
+          </div>
         </div>
 
-        <label className="block md:col-span-4">
+        <label className="block mb-4">
           <p className="text-slate-400 text-sm mb-2">搜尋</p>
           <input
             value={searchText}
@@ -191,80 +314,45 @@ export default function PlayersTable({ players }: PlayersTableProps) {
         </label>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <label className="block">
-            <p className="text-slate-400 text-sm mb-2">類型</p>
-            <select
-              value={typeFilter}
-              onChange={(event) => {
-                setTypeFilter(event.target.value);
-                updateFilter("type", event.target.value);
-              }}
-              className="w-full rounded-xl bg-slate-800 border border-slate-700 p-3 text-white"
-            >
-              <option>全部</option>
-              <option>投手</option>
-              <option>野手</option>
-            </select>
-          </label>
+          <FilterSelect
+            label="類型"
+            value={typeFilter}
+            options={TYPE_OPTIONS}
+            onChange={(value) => {
+              setTypeFilter(value);
+              updateFilter("type", value);
+            }}
+          />
 
-          <label className="block">
-            <p className="text-slate-400 text-sm mb-2">聯盟</p>
-            <select
-              value={leagueFilter}
-              onChange={(event) => {
-                setLeagueFilter(event.target.value);
-                updateFilter("league", event.target.value);
-              }}
-              className="w-full rounded-xl bg-slate-800 border border-slate-700 p-3 text-white"
-            >
-              <option>全部</option>
-              <option>美職</option>
-              <option>日職</option>
-              <option>韓職</option>
-              <option>台裔</option>
-              <option>其他</option>
-            </select>
-          </label>
+          <FilterSelect
+            label="聯盟"
+            value={leagueFilter}
+            options={LEAGUE_OPTIONS}
+            onChange={(value) => {
+              setLeagueFilter(value);
+              updateFilter("league", value);
+            }}
+          />
 
-          <label className="block">
-            <p className="text-slate-400 text-sm mb-2">層級</p>
-            <select
-              value={levelFilter}
-              onChange={(event) => {
-                setLevelFilter(event.target.value);
-                updateFilter("level", event.target.value);
-              }}
-              className="w-full rounded-xl bg-slate-800 border border-slate-700 p-3 text-white"
-            >
-              <option>全部</option>
-              <option>MLB</option>
-              <option>3A</option>
-              <option>2A</option>
-              <option>A+</option>
-              <option>1A</option>
-              <option>RK</option>
-              <option>日職一軍</option>
-              <option>日職二軍</option>
-              <option>韓職一軍</option>
-            </select>
-          </label>
+          <FilterSelect
+            label="層級"
+            value={levelFilter}
+            options={LEVEL_OPTIONS}
+            onChange={(value) => {
+              setLevelFilter(value);
+              updateFilter("level", value);
+            }}
+          />
 
-          <label className="block">
-            <p className="text-slate-400 text-sm mb-2">狀態</p>
-            <select
-              value={statusFilter}
-              onChange={(event) => {
-                setStatusFilter(event.target.value);
-                updateFilter("status", event.target.value);
-              }}
-              className="w-full rounded-xl bg-slate-800 border border-slate-700 p-3 text-white"
-            >
-              <option>全部</option>
-              <option>現役</option>
-              <option>傷兵</option>
-              <option>異動</option>
-            </select>
-          </label>
+          <FilterSelect
+            label="狀態"
+            value={statusFilter}
+            options={STATUS_OPTIONS}
+            onChange={(value) => {
+              setStatusFilter(value);
+              updateFilter("status", value);
+            }}
+          />
         </div>
       </div>
 
@@ -295,52 +383,73 @@ export default function PlayersTable({ players }: PlayersTableProps) {
             </thead>
 
             <tbody>
-              {filteredPlayers.map((player, index) => {
-                const name = String(player.name ?? "-");
-                const movement = String(player.movement ?? "-");
-                const statusText = String(player.note ?? player.status ?? "-");
-
-                return (
-                  <tr
-                    key={`${name}-${index}`}
-                    className="border-t border-slate-800 hover:bg-slate-800/60"
+              {filteredPlayers.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={9}
+                    className="p-8 text-center text-slate-400 border-t border-slate-800"
                   >
-                    <td className="sticky left-0 z-30 bg-slate-900 p-3 text-left font-medium border-r border-slate-800">
-                      <Link
-                        href={`/players/${encodeURIComponent(String(player.name ?? ""))}`}
-                        className="text-sky-300 hover:text-sky-200 hover:underline"
-                      >
-                        {String(player.name ?? "-")}
-                      </Link>
-                    </td>
-                    
-                    <td className="p-3">{String(player.type ?? "-")}</td>
-                    <td className="p-3">
-                      {String(player.league ?? "-")
-                        .replace("旅美", "美職")
-                        .replace("旅日", "日職")
-                        .replace("旅韓", "韓職")}
-                    </td>
-                    <td className="p-3">{String(player.team ?? "-")}</td>
-                    <td className="p-3">{String(player.level ?? "-")}</td>
+                    找不到符合條件的球員
+                  </td>
+                </tr>
+              ) : (
+                filteredPlayers.map((player, index) => {
+                  const name = normalizeText(player.name) || "-";
+                  const movement = normalizeText(player.movement) || "-";
+                  const statusText = normalizeText(player.note);
+                  const hasStatusChange = statusText !== "" && statusText !== "-";
 
-                    <td className="p-3">
-                      <span className={getMovementClass(String(movement ?? ""))}>
-                        {String(movement ?? "-")}
-                      </span>
-                    </td>
+                  return (
+                    <tr
+                      key={`${name}-${index}`}
+                      className="border-t border-slate-800 hover:bg-slate-800/60"
+                    >
+                      <td className="sticky left-0 z-30 bg-slate-900 p-3 text-left font-medium border-r border-slate-800">
+                        <Link
+                          href={`/players/${encodeURIComponent(name)}`}
+                          className="text-sky-300 hover:text-sky-200 hover:underline"
+                        >
+                          {name}
+                        </Link>
+                      </td>
 
-                    <td className="p-3">
-                      <span className={getStatusClass(String(statusText ?? ""))}>
-                        {String(statusText ?? "-")}
-                      </span>
-                    </td>
+                      <td className="p-3">
+                        {normalizeText(player.type) || "-"}
+                      </td>
+                      <td className="p-3">{normalizeLeague(player.league)}</td>
+                      <td className="p-3">
+                        {normalizeText(player.team) || "-"}
+                      </td>
+                      <td className="p-3">
+                        {normalizeText(player.level) || "-"}
+                      </td>
 
-                    <td className="p-3">{String(player.lastStart ?? "-")}</td>
-                    <td className="p-3">{String(player.expectedStart ?? "-")}</td>
-                  </tr>
-                );
-              })}
+                      <td className="p-3">
+                        <span className={getMovementClass(movement)}>
+                          {movement}
+                        </span>
+                      </td>
+
+                      <td className="p-3">
+                        {hasStatusChange ? (
+                          <span className={getStatusClass(statusText)}>
+                            {statusText}
+                          </span>
+                        ) : (
+                          <span className="text-slate-500">-</span>
+                        )}
+                      </td>
+
+                      <td className="p-3">
+                        {normalizeText(player.lastStart) || "-"}
+                      </td>
+                      <td className="p-3">
+                        {normalizeText(player.expectedStart) || "-"}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>

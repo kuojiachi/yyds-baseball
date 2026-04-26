@@ -3,8 +3,8 @@ import "server-only";
 import * as XLSX from "xlsx";
 import path from "node:path";
 import { readFile } from "node:fs/promises";
-type ExcelCellValue = string | number | boolean | null | undefined;
 
+type ExcelCellValue = string | number | boolean | null | undefined;
 type ExcelRow = Record<string, ExcelCellValue>;
 
 export type Player = {
@@ -73,12 +73,24 @@ export type Player = {
   kRatePitching?: string;
 };
 
-function valueToString(value: unknown) {
+export type TodayReport = {
+  date: string;
+  name: string;
+  type: string;
+  league: string;
+  team: string;
+  level: string;
+  result: string;
+  opponent: string;
+  stats: string;
+};
+
+function valueToString(value: unknown): string {
   if (value === undefined || value === null) return "";
   return String(value).trim();
 }
 
-function getRowValue(row: Record<string, unknown>, possibleKeys: string[]) {
+function getRowValue(row: Record<string, unknown>, possibleKeys: string[]): string {
   const matchedKey = Object.keys(row).find((key) =>
     possibleKeys.includes(key.trim())
   );
@@ -86,6 +98,15 @@ function getRowValue(row: Record<string, unknown>, possibleKeys: string[]) {
   if (!matchedKey) return "";
 
   return valueToString(row[matchedKey]);
+}
+
+function normalizeLeague(category: string): string {
+  if (category === "旅美") return "MiLB";
+  if (category === "旅日") return "NPB";
+  if (category === "旅韓") return "KBO";
+  if (category === "台裔") return "MLB";
+
+  return category;
 }
 
 export async function getExcelWorkbook() {
@@ -97,93 +118,108 @@ export async function getExcelWorkbook() {
 
 export async function getPlayersFromExcel(): Promise<Player[]> {
   const workbook = await getExcelWorkbook();
-  const sheet = workbook.Sheets["總表"];
+
+  const sheet =
+    workbook.Sheets["總表"] ||
+    workbook.Sheets["球員總表"] ||
+    workbook.Sheets["players"];
 
   if (!sheet) return [];
 
-  const rows = XLSX.utils.sheet_to_json<ExcelRow>(sheet);
+  const rows = XLSX.utils.sheet_to_json<ExcelRow>(sheet, {
+    defval: "",
+  });
 
-  return rows.map((row) => ({
-    name: getRowValue(row, ["球員", "姓名", "name"]),
-    type: getRowValue(row, ["守位", "位置", "守備位置", "球員類型", "類型", "type"]),
-    league: getRowValue(row, ["分類", "聯盟", "league"]),
-    team: getRowValue(row, ["球隊", "team"]),
-    level: getRowValue(row, ["層級", "等級", "level"]),
-    movement: getRowValue(row, ["升降", "異動", "movement"]),
-    status: getRowValue(row, ["狀態", "status"]),
-    lastStart: getRowValue(row, ["上次先發", "lastStart"]),
-    expectedStart: getRowValue(row, ["預期先發", "expectedStart"]),
-    identity: getRowValue(row, ["身分", "identity"]),
-    note: getRowValue(row, ["狀態異動", "傷病", "備註", "note"]),
-    games: getRowValue(row, ["出賽", "G", "games"]),
-    atBats: getRowValue(row, ["打數", "AB", "atBats"]),
-    hits: getRowValue(row, ["安打", "H", "hits"]),
-    doubles: getRowValue(row, ["二安", "2B", "doubles"]),
-    triples: getRowValue(row, ["三安", "3B", "triples"]),
-    homeRuns: getRowValue(row, ["全壘打", "HR", "homeRuns"]),
-    rbi: getRowValue(row, ["打點", "RBI", "rbi"]),
-    runs: getRowValue(row, ["得分", "R", "runs"]),
-    walks: getRowValue(row, ["四壞", "BB", "walks"]),
-    strikeouts: getRowValue(row, ["三振", "SO", "K", "strikeouts"]),
-    stolenBases: getRowValue(row, ["盜壘", "SB", "stolenBases"]),
+  return rows
+    .map((row) => ({
+      name: getRowValue(row, ["球員", "姓名", "name"]),
+      type: getRowValue(row, [
+        "守位",
+        "位置",
+        "守備位置",
+        "球員類型",
+        "類型",
+        "type",
+      ]),
+      league: getRowValue(row, ["分類", "聯盟", "league"]),
+      team: getRowValue(row, ["球隊", "team"]),
+      level: getRowValue(row, ["層級", "等級", "level"]),
+      movement: getRowValue(row, ["升降", "異動", "movement"]),
+      status: getRowValue(row, ["狀態", "status"]),
+      lastStart: getRowValue(row, ["上次先發", "lastStart"]),
+      expectedStart: getRowValue(row, ["預期先發", "expectedStart"]),
+      identity: getRowValue(row, ["身分", "identity"]),
+      note: getRowValue(row, ["狀態異動", "傷病", "備註", "note"]),
 
-    avg: getRowValue(row, ["打擊率", "AVG", "avg"]),
-    obp: getRowValue(row, ["上壘率", "OBP", "obp"]),
-    slg: getRowValue(row, ["長打率", "SLG", "slg"]),
-    ops: getRowValue(row, ["OPS", "ops"]),
-    opsPlus: getRowValue(row, ["OPS+", "opsPlus"]),
-    iso: getRowValue(row, ["ISO", "iso"]),
-    babip: getRowValue(row, ["BABIP", "babip"]),
-    bbRate: getRowValue(row, ["BB%", "bbRate"]),
-    kRate: getRowValue(row, ["K%", "kRate"]),
-    whiffRate: getRowValue(row, ["Whiff%", "whiffRate"]),
-    woba: getRowValue(row, ["wOBA", "woba"]),
-    starts: getRowValue(row, ["先發", "GS", "starts"]),
-    wins: getRowValue(row, ["勝", "W", "wins"]),
-    losses: getRowValue(row, ["敗", "L", "losses"]),
-    innings: getRowValue(row, ["局數", "IP", "innings"]),
-    battersFaced: getRowValue(row, ["面對打者", "BF", "battersFaced"]),
-    pitches: getRowValue(row, ["投球數", "Pitches", "NP", "pitches"]),
-    runsAllowed: getRowValue(row, ["失分", "R", "runsAllowed"]),
-    earnedRuns: getRowValue(row, ["責失", "ER", "earnedRuns"]),
-    hitsAllowed: getRowValue(row, ["被安打", "H", "hitsAllowed"]),
-    homeRunsAllowed: getRowValue(row, ["被全壘打", "全壘打", "HR", "homeRunsAllowed"]),
-    walksAllowed: getRowValue(row, ["四壞", "BB", "walksAllowed"]),
-    strikeoutsPitching: getRowValue(row, ["三振", "SO", "K", "strikeoutsPitching"]),
+      games: getRowValue(row, ["出賽", "G", "games"]),
+      atBats: getRowValue(row, ["打數", "AB", "atBats"]),
+      hits: getRowValue(row, ["安打", "H", "hits"]),
+      doubles: getRowValue(row, ["二安", "2B", "doubles"]),
+      triples: getRowValue(row, ["三安", "3B", "triples"]),
+      homeRuns: getRowValue(row, ["全壘打", "HR", "homeRuns"]),
+      rbi: getRowValue(row, ["打點", "RBI", "rbi"]),
+      runs: getRowValue(row, ["得分", "R", "runs"]),
+      walks: getRowValue(row, ["四壞", "BB", "walks"]),
+      strikeouts: getRowValue(row, ["三振", "SO", "K", "strikeouts"]),
+      stolenBases: getRowValue(row, ["盜壘", "SB", "stolenBases"]),
 
-    era: getRowValue(row, ["防禦率", "ERA", "era"]),
-    eraPlus: getRowValue(row, ["ERA+", "eraPlus"]),
-    fip: getRowValue(row, ["FIP", "fip"]),
-    whip: getRowValue(row, ["WHIP", "whip"]),
-    lobRate: getRowValue(row, ["LOB%", "lobRate"]),
-    babipAllowed: getRowValue(row, ["被BABIP", "BABIP", "babipAllowed"]),
-    avgAllowed: getRowValue(row, ["被打擊率", "AVG", "avgAllowed"]),
-    obpAllowed: getRowValue(row, ["被上壘率", "OBP", "obpAllowed"]),
-    slgAllowed: getRowValue(row, ["被長打率", "SLG", "slgAllowed"]),
-    opsPlusAllowed: getRowValue(row, ["被OPS+", "OPS+", "opsPlusAllowed"]),
-    h9: getRowValue(row, ["H9", "H/9", "h9"]),
-    hr9: getRowValue(row, ["HR9", "HR/9", "hr9"]),
-    bbRatePitching: getRowValue(row, ["BB%", "bbRatePitching"]),
-    kRatePitching: getRowValue(row, ["K%", "kRatePitching"]),
-  }));
+      avg: getRowValue(row, ["打擊率", "AVG", "avg"]),
+      obp: getRowValue(row, ["上壘率", "OBP", "obp"]),
+      slg: getRowValue(row, ["長打率", "SLG", "slg"]),
+      ops: getRowValue(row, ["OPS", "ops"]),
+      opsPlus: getRowValue(row, ["OPS+", "opsPlus"]),
+      iso: getRowValue(row, ["ISO", "iso"]),
+      babip: getRowValue(row, ["BABIP", "babip"]),
+      bbRate: getRowValue(row, ["BB%", "bbRate"]),
+      kRate: getRowValue(row, ["K%", "kRate"]),
+      whiffRate: getRowValue(row, ["Whiff%", "whiffRate"]),
+      woba: getRowValue(row, ["wOBA", "woba"]),
+
+      starts: getRowValue(row, ["先發", "GS", "starts"]),
+      wins: getRowValue(row, ["勝", "W", "wins"]),
+      losses: getRowValue(row, ["敗", "L", "losses"]),
+      innings: getRowValue(row, ["局數", "IP", "innings"]),
+      battersFaced: getRowValue(row, ["面對打者", "BF", "battersFaced"]),
+      pitches: getRowValue(row, ["投球數", "Pitches", "NP", "pitches"]),
+      runsAllowed: getRowValue(row, ["失分", "R", "runsAllowed"]),
+      earnedRuns: getRowValue(row, ["責失", "ER", "earnedRuns"]),
+      hitsAllowed: getRowValue(row, ["被安打", "H", "hitsAllowed"]),
+      homeRunsAllowed: getRowValue(row, [
+        "被全壘打",
+        "全壘打",
+        "HR",
+        "homeRunsAllowed",
+      ]),
+      walksAllowed: getRowValue(row, ["四壞", "BB", "walksAllowed"]),
+      strikeoutsPitching: getRowValue(row, [
+        "三振",
+        "SO",
+        "K",
+        "strikeoutsPitching",
+      ]),
+
+      era: getRowValue(row, ["防禦率", "ERA", "era"]),
+      eraPlus: getRowValue(row, ["ERA+", "eraPlus"]),
+      fip: getRowValue(row, ["FIP", "fip"]),
+      whip: getRowValue(row, ["WHIP", "whip"]),
+      lobRate: getRowValue(row, ["LOB%", "lobRate"]),
+      babipAllowed: getRowValue(row, ["被BABIP", "BABIP", "babipAllowed"]),
+      avgAllowed: getRowValue(row, ["被打擊率", "AVG", "avgAllowed"]),
+      obpAllowed: getRowValue(row, ["被上壘率", "OBP", "obpAllowed"]),
+      slgAllowed: getRowValue(row, ["被長打率", "SLG", "slgAllowed"]),
+      opsPlusAllowed: getRowValue(row, ["被OPS+", "OPS+", "opsPlusAllowed"]),
+      h9: getRowValue(row, ["H9", "H/9", "h9"]),
+      hr9: getRowValue(row, ["HR9", "HR/9", "hr9"]),
+      bbRatePitching: getRowValue(row, ["BB%", "bbRatePitching"]),
+      kRatePitching: getRowValue(row, ["K%", "kRatePitching"]),
+    }))
+    .filter((player) => player.name && player.name !== "球員");
 }
 
-  export type TodayReport = {
-    date: string;
-    name: string;
-    type: string;
-    league: string;
-    team: string;
-    level: string;
-    result: string;
-    opponent: string;
-    stats: string;
-  };
-  export async function getTodayReportsFromExcel(): Promise<TodayReport[]> {
+export async function getTodayReportsFromExcel(): Promise<TodayReport[]> {
   const workbook = await getExcelWorkbook();
-  const sheet =
-    workbook.Sheets["今日戰報"] ||
-    workbook.Sheets["今日出賽"];
+
+  const sheet = workbook.Sheets["今日戰報"] || workbook.Sheets["今日出賽"];
 
   if (!sheet) return [];
 
@@ -202,89 +238,42 @@ export async function getPlayersFromExcel(): Promise<Player[]> {
   if (headerRowIndex === -1) return [];
 
   const headerRow = rows[headerRowIndex];
+
   const hasDateColumn =
     valueToString(headerRow[0]) === "日期" &&
     valueToString(headerRow[1]) === "球員";
 
   const dataRows = rows.slice(headerRowIndex + 1);
 
-  const reports = dataRows.map((row) => {
-    const date = hasDateColumn ? valueToString(row[0]) : "";
+  return dataRows
+    .map((row) => {
+      const date = hasDateColumn ? valueToString(row[0]) : "";
+      const name = hasDateColumn ? valueToString(row[1]) : valueToString(row[0]);
+      const category = hasDateColumn ? valueToString(row[2]) : valueToString(row[1]);
+      const level = hasDateColumn ? valueToString(row[3]) : valueToString(row[2]);
+      const position = hasDateColumn ? valueToString(row[4]) : valueToString(row[3]);
+      const team = hasDateColumn ? valueToString(row[5]) : valueToString(row[4]);
+      const result = hasDateColumn ? valueToString(row[6]) : valueToString(row[5]);
+      const opponent = hasDateColumn ? valueToString(row[7]) : valueToString(row[6]);
+      const stats = hasDateColumn ? valueToString(row[8]) : valueToString(row[7]);
 
-    const name = hasDateColumn ? valueToString(row[1]) : valueToString(row[0]);
-    const category = hasDateColumn ? valueToString(row[2]) : valueToString(row[1]);
-    const level = hasDateColumn ? valueToString(row[3]) : valueToString(row[2]);
-    const position = hasDateColumn ? valueToString(row[4]) : valueToString(row[3]);
-    const team = hasDateColumn ? valueToString(row[5]) : valueToString(row[4]);
-    const result = hasDateColumn ? valueToString(row[6]) : valueToString(row[5]);
-    const opponent = hasDateColumn ? valueToString(row[7]) : valueToString(row[6]);
-    const stats = hasDateColumn ? valueToString(row[8]) : valueToString(row[7]);
+      return {
+        date,
+        name,
+        type: position,
+        league: normalizeLeague(category),
+        team,
+        level,
+        result,
+        opponent: opponent || "-",
+        stats: stats || "-",
+      };
+    })
+    .filter((report) => {
+      if (!report.name) return false;
+      if (report.name === "球員") return false;
+      if (report.name === "投手" || report.name === "野手") return false;
 
-    return {
-      date,
-      name,
-      type: position,
-      league:
-        category === "旅美"
-          ? "MiLB"
-          : category === "旅日"
-          ? "NPB"
-          : category === "旅韓"
-          ? "KBO"
-          : category === "台裔"
-          ? "MLB"
-          : category,
-      team,
-      level,
-      result,
-      opponent: opponent || "-",
-      stats: stats || "-",
-    };
-  });
-
-  return reports.filter((report) => {
-    if (!report.name) return false;
-    if (report.name === "球員") return false;
-    if (report.name === "投手" || report.name === "野手") return false;
-
-    return report.stats !== "" && report.stats !== "-";
-  });
-}
-
-export async function getTodayReports(): Promise<ExcelRow[]> {
-  const workbook = await getExcelWorkbook();
-
-  const sheet = workbook.Sheets["今日戰報"];
-  if (!sheet) return [];
-
-  const rows = XLSX.utils.sheet_to_json<ExcelRow>(sheet, {
-    defval: "",
-  });
-
-  return rows.filter((row) => {
-    const todayResult =
-      row["今日成績"] ||
-      row["成績"] ||
-      row["打擊成績"] ||
-      row["投球成績"] ||
-      "";
-
-    return String(todayResult).trim() !== "";
-  });
-}
-export async function getPlayers(): Promise<ExcelRow[]> {
-  const workbook = await getExcelWorkbook();
-
-  const sheet =
-    workbook.Sheets["總表"] ||
-    workbook.Sheets["球員總表"] ||
-    workbook.Sheets["players"];
-
-  if (!sheet) return [];
-
-  const rows = XLSX.utils.sheet_to_json<ExcelRow>(sheet, {
-    defval: "",
-  });
-
-  return rows;
+      return report.stats !== "" && report.stats !== "-";
+    });
 }

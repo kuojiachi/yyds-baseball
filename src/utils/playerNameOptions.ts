@@ -1,11 +1,11 @@
 import type { Player } from "@/src/lib/excel";
 
-export function getPlayerNameOptions(players: Player[]) {
+function normalizeText(value: unknown): string {
+  return String(value ?? "").trim();
+}
+
+export function getPlayerNameOptions(players: Player[]): string[] {
   return Array.from(
-    new Set(
-      players
-        .map((player) => String(player.name || "").trim())
-        .filter(Boolean)
-    )
+    new Set(players.map((player) => normalizeText(player.name)).filter(Boolean))
   ).sort((a, b) => a.localeCompare(b, "zh-Hant"));
 }

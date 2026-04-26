@@ -205,9 +205,14 @@ export default async function Home() {
                       </td>
 
                       <td className="p-3 text-center">
-                        <span className={getStatusClass(String(player.note ?? player.status ?? ""))}>
-                          {String(player.note ?? player.status ?? "-")}
-                        </span>
+                        {String(player.note ?? "").trim() &&
+                        String(player.note ?? "").trim() !== "-" ? (
+                          <span className={getStatusClass(String(player.note ?? ""))}>
+                            {String(player.note ?? "")}
+                          </span>
+                        ) : (
+                          <span className="text-slate-500">-</span>
+                        )}
                       </td>
                     </tr>
                   ))}

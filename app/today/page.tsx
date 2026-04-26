@@ -1,7 +1,12 @@
-import SiteHeader from "@/src/components/SiteHeader";
-import { getPlayerNameOptions } from "@/src/utils/playerNameOptions";
-import {getPlayersFromExcel,getTodayReportsFromExcel,} from "@/src/lib/excel";
 import { Suspense } from "react";
+
+import SiteHeader from "@/src/components/SiteHeader";
+import {
+  getPlayersFromExcel,
+  getTodayReportsFromExcel,
+} from "@/src/lib/excel";
+import { getPlayerNameOptions } from "@/src/utils/playerNameOptions";
+
 import TodayTable from "./TodayTable";
 
 export default async function TodayPage() {

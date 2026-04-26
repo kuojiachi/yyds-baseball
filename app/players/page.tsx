@@ -1,7 +1,9 @@
-import SiteHeader from "@/src/components/SiteHeader";
-import { getPlayerNameOptions } from "@/src/utils/playerNameOptions";
 import { Suspense } from "react";
+
+import SiteHeader from "@/src/components/SiteHeader";
 import { getPlayersFromExcel } from "@/src/lib/excel";
+import { getPlayerNameOptions } from "@/src/utils/playerNameOptions";
+
 import PlayersTable from "./PlayersTable";
 
 export default async function PlayersPage() {

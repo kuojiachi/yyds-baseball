@@ -4,19 +4,14 @@ type SortablePlayer = {
   team?: string | number | null;
   name?: string | number | null;
   player?: string | number | null;
-  status?: string | number | null;
-  note?: string | number | null;
-  movement?: string | number | null;
-  identity?: string | number | null;
-  [key: string]: unknown;
 };
 
-function text(value: unknown) {
+function normalizeText(value: unknown): string {
   return String(value ?? "").trim();
 }
 
-function getLevelRank(levelValue: unknown) {
-  const level = text(levelValue);
+function getLevelRank(levelValue: unknown): number {
+  const level = normalizeText(levelValue);
 
   const rankMap: Record<string, number> = {
     MLB: 1,
@@ -40,37 +35,53 @@ function getLevelRank(levelValue: unknown) {
   return rankMap[level] ?? 99;
 }
 
-function getLeagueRank(leagueValue: unknown) {
-  const league = text(leagueValue);
+function getLeagueRank(leagueValue: unknown): number {
+  const league = normalizeText(leagueValue);
 
-  if (league === "旅美" || league === "美職" || league === "MLB" || league === "MiLB") return 1;
-  if (league === "旅日" || league === "日職" || league === "NPB") return 2;
-  if (league === "旅韓" || league === "韓職" || league === "KBO") return 3;
-  if (league === "台裔") return 9;
+  if (
+    league === "旅美" ||
+    league === "美職" ||
+    league === "MLB" ||
+    league === "MiLB"
+  ) {
+    return 1;
+  }
+
+  if (league === "旅日" || league === "日職" || league === "NPB") {
+    return 2;
+  }
+
+  if (league === "旅韓" || league === "韓職" || league === "KBO") {
+    return 3;
+  }
+
+  if (league === "台裔") {
+    return 9;
+  }
 
   return 8;
 }
 
-export function sortPlayersForTable(players: SortablePlayer[]) {
+export function sortPlayersForTable<T extends SortablePlayer>(players: T[]): T[] {
   return [...players].sort((a, b) => {
+    const levelCompare = getLevelRank(a.level) - getLevelRank(b.level);
 
-    const aLevelRank = getLevelRank(a.level);
-    const bLevelRank = getLevelRank(b.level);
+    if (levelCompare !== 0) return levelCompare;
 
-    if (aLevelRank !== bLevelRank) {
-      return aLevelRank - bLevelRank;
-    }
+    const leagueCompare = getLeagueRank(a.league) - getLeagueRank(b.league);
 
-    const aLeagueRank = getLeagueRank(a.league);
-    const bLeagueRank = getLeagueRank(b.league);
+    if (leagueCompare !== 0) return leagueCompare;
 
-    if (aLeagueRank !== bLeagueRank) {
-      return aLeagueRank - bLeagueRank;
-    }
+    const teamCompare = normalizeText(a.team).localeCompare(
+      normalizeText(b.team),
+      "zh-Hant"
+    );
 
-    const teamCompare = text(a.team).localeCompare(text(b.team), "zh-Hant");
     if (teamCompare !== 0) return teamCompare;
 
-    return text(a.name || a.player).localeCompare(text(b.name || b.player), "zh-Hant");
+    return normalizeText(a.name || a.player).localeCompare(
+      normalizeText(b.name || b.player),
+      "zh-Hant"
+    );
   });
 }

@@ -8,24 +8,25 @@ type SiteHeaderProps = {
   rightSlot?: ReactNode;
 };
 
-export default function SiteHeader({
-  subtitle,
-  showSearch = true,
-  playerNameOptions = [],
-  rightSlot,
-}: SiteHeaderProps) {
-  const searchBox = (
+const NAV_ITEMS = [
+  { href: "/", label: "首頁" },
+  { href: "/today", label: "今日出賽" },
+  { href: "/players", label: "總表" },
+];
+
+function SearchBox({ playerNameOptions }: { playerNameOptions: string[] }) {
+  return (
     <div className="w-full md:w-[380px]">
       <form action="/search" className="flex w-full gap-2">
         <input
           name="q"
           type="search"
-          list="site-player-search-options"
+          list="twds-player-search-options"
           placeholder="搜尋球員、球隊、層級..."
           className="w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-sky-500 focus:outline-none"
         />
 
-        <datalist id="site-player-search-options">
+        <datalist id="twds-player-search-options">
           {playerNameOptions.map((name) => (
             <option key={name} value={name} />
           ))}
@@ -44,51 +45,57 @@ export default function SiteHeader({
       </p>
     </div>
   );
+}
 
+function NavMenu() {
+  return (
+    <details className="relative">
+      <summary className="list-none cursor-pointer rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xl font-bold text-white hover:bg-slate-800">
+        ☰
+      </summary>
+
+      <div className="absolute left-0 z-50 mt-2 w-40 overflow-hidden rounded-xl border border-slate-700 bg-slate-900 shadow-xl shadow-black/40">
+        {NAV_ITEMS.map((item, index) => (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={[
+              "block px-4 py-3 text-sm text-slate-200 hover:bg-slate-800",
+              index > 0 ? "border-t border-slate-800" : "",
+            ].join(" ")}
+          >
+            {item.label}
+          </Link>
+        ))}
+      </div>
+    </details>
+  );
+}
+
+export default function SiteHeader({
+  subtitle,
+  showSearch = true,
+  playerNameOptions = [],
+  rightSlot,
+}: SiteHeaderProps) {
   return (
     <header className="mb-8 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
       <div className="flex items-center gap-3">
-        <details className="relative">
-          <summary className="list-none cursor-pointer rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xl font-bold text-white hover:bg-slate-800">
-            ☰
-          </summary>
-
-          <div className="absolute left-0 z-50 mt-2 w-40 overflow-hidden rounded-xl border border-slate-700 bg-slate-900 shadow-xl shadow-black/40">
-            <Link
-              href="/"
-              className="block px-4 py-3 text-sm text-slate-200 hover:bg-slate-800"
-            >
-              首頁
-            </Link>
-
-            <Link
-              href="/today"
-              className="block border-t border-slate-800 px-4 py-3 text-sm text-slate-200 hover:bg-slate-800"
-            >
-              今日出賽
-            </Link>
-
-            <Link
-              href="/players"
-              className="block border-t border-slate-800 px-4 py-3 text-sm text-slate-200 hover:bg-slate-800"
-            >
-              總表
-            </Link>
-          </div>
-        </details>
+        <NavMenu />
 
         <Link href="/" className="inline-block">
           <h1 className="text-4xl font-bold hover:text-sky-300 transition">
             TWDS
           </h1>
 
-          {subtitle ? (
-            <p className="mt-2 text-slate-300">{subtitle}</p>
-          ) : null}
+          {subtitle ? <p className="mt-2 text-slate-300">{subtitle}</p> : null}
         </Link>
       </div>
 
-      {rightSlot ?? (showSearch ? searchBox : null)}
+      {rightSlot ??
+        (showSearch ? (
+          <SearchBox playerNameOptions={playerNameOptions} />
+        ) : null)}
     </header>
   );
 }
