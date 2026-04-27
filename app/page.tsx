@@ -12,11 +12,17 @@ export default async function Home() {
   const movedPlayers = players.filter((player) => {
     const movement = String(player.movement || "").trim();
     const statusChange = String(player.note || "").trim();
+    const status = String(player.status || "").trim();
+    const statusLabel = String(player.statusLabel || "").trim();
 
-    return (
-      (movement !== "" && movement !== "-") ||
-      (statusChange !== "" && statusChange !== "-")
-    );
+    const hasMovement = movement !== "" && movement !== "-";
+    const hasStatusChange = statusChange !== "" && statusChange !== "-";
+    const hasStatusLabel =
+      statusLabel !== "" && statusLabel !== "-" && statusLabel !== "現役";
+    const hasNonActiveStatus =
+      status !== "" && status !== "-" && status !== "現役";
+
+    return hasMovement || hasStatusChange || hasStatusLabel || hasNonActiveStatus;
   });
 
   const totalPlayers = players.length;
@@ -217,16 +223,26 @@ export default async function Home() {
                       </td>
 
                       <td className="p-3 text-center">
-                        <span className={getMovementClass(String(player.movement ?? ""))}>
-                          {String(player.movement ?? "-")}
-                        </span>
+                        {String(player.movement ?? "").trim() &&
+                        String(player.movement ?? "").trim() !== "-" ? (
+                          <span className={getMovementClass(String(player.movement ?? ""))}>
+                            {String(player.movement ?? "")}
+                          </span>
+                        ) : (
+                          <span className="text-slate-500">-</span>
+                        )}
                       </td>
 
                       <td className="p-3 text-center">
-                        {String(player.note ?? "").trim() &&
-                        String(player.note ?? "").trim() !== "-" ? (
-                          <span className={getStatusClass(String(player.note ?? ""))}>
-                            {String(player.note ?? "")}
+                        {String(player.note || player.statusLabel || player.status || "").trim() &&
+                        String(player.note || player.statusLabel || player.status || "").trim() !== "-" &&
+                        String(player.note || player.statusLabel || player.status || "").trim() !== "現役" ? (
+                          <span
+                            className={getStatusClass(
+                              String(player.note || player.statusLabel || player.status || "")
+                            )}
+                          >
+                            {String(player.note || player.statusLabel || player.status || "")}
                           </span>
                         ) : (
                           <span className="text-slate-500">-</span>

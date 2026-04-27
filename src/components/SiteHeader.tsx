@@ -177,30 +177,30 @@ export default function SiteHeader({
 }: SiteHeaderProps) {
   return (
     <header className="mb-4">
-      <div className="flex items-center gap-4 border-b border-slate-800 pb-3">
-        <NavMenu />
+      <div className="flex flex-col gap-3 border-b border-slate-800 pb-3 md:flex-row md:items-center md:justify-between">
+        <div className="flex items-center gap-4">
+          <NavMenu />
 
-        <nav className="flex items-center gap-4 text-sm font-bold text-slate-200">
-          <Link href="/" className="hover:text-sky-300 transition">
-            首頁
-          </Link>
+          <nav className="flex items-center gap-4 text-sm font-bold text-slate-200">
+            <Link href="/" className="hover:text-sky-300 transition">
+              首頁
+            </Link>
 
-          <Link href="/today" className="hover:text-sky-300 transition">
-            今日出賽
-          </Link>
+            <Link href="/today" className="hover:text-sky-300 transition">
+              今日出賽
+            </Link>
 
-          <Link href="/players" className="hover:text-sky-300 transition">
-            總表
-          </Link>
-        </nav>
-      </div>
+            <Link href="/players" className="hover:text-sky-300 transition">
+              總表
+            </Link>
+          </nav>
+        </div>
 
-      {rightSlot ??
-        (showSearch ? (
-          <div className="mt-3 flex justify-end">
+        {rightSlot ??
+          (showSearch ? (
             <SearchBox playerNameOptions={playerNameOptions} />
-          </div>
-        ) : null)}
+          ) : null)}
+      </div>
     </header>
   );
 }

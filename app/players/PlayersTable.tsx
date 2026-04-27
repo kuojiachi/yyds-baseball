@@ -441,11 +441,14 @@ export default function PlayersTable({ players }: PlayersTableProps) {
               ) : (
                 filteredPlayers.map((player, index) => {
                   const name = normalizeText(player.name) || "-";
-                  const movement = normalizeText(player.movement) || "-";
-                  const statusText = normalizeText(player.note);
-                  const hasStatusChange =
-                    statusText !== "" && statusText !== "-";
+                  const movement = normalizeText(player.movement);
+                  const hasMovement = movement !== "" && movement !== "-";
+                  const statusText = normalizeText(
+                    player.note || player.statusLabel || player.status
+                  );
 
+                  const hasStatusChange =
+                    statusText !== "" && statusText !== "-" && statusText !== "現役";
                   return (
                     <tr
                       key={`${name}-${index}`}
@@ -474,9 +477,13 @@ export default function PlayersTable({ players }: PlayersTableProps) {
                       </td>
 
                       <td className="p-3">
-                        <span className={getMovementClass(movement)}>
-                          {movement}
-                        </span>
+                        {hasMovement ? (
+                          <span className={getMovementClass(movement)}>
+                            {movement}
+                          </span>
+                        ) : (
+                          <span className="text-slate-500">-</span>
+                        )}
                       </td>
 
                       <td className="p-3">
