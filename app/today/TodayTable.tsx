@@ -12,10 +12,9 @@ type TodayTableProps = {
 
 const ALL = "全部";
 
-const TYPE_OPTIONS = [ALL, "投手", "野手"];
-const LEAGUE_OPTIONS = [ALL, "MLB", "MiLB", "NPB", "KBO", "其他"];
+const TYPE_OPTIONS = ["投手", "野手"];
+const LEAGUE_OPTIONS = ["MLB", "MiLB", "NPB", "KBO", "其他"];
 const LEVEL_OPTIONS = [
-  ALL,
   "MLB",
   "3A",
   "2A",
@@ -35,14 +34,19 @@ function normalizeSearchText(value: unknown): string {
   return normalizeText(value).toLowerCase();
 }
 
+function parseMultiParam(value: string | null): string[] {
+  if (!value) return [];
+
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 function isPitcher(report: TodayReport): boolean {
   const type = normalizeText(report.type).toLowerCase();
 
-  return (
-    type.includes("投") ||
-    type.includes("pitcher") ||
-    type === "p"
-  );
+  return type.includes("投") || type.includes("pitcher") || type === "p";
 }
 
 function isHitter(report: TodayReport): boolean {
@@ -86,28 +90,84 @@ function matchesDate(report: TodayReport, dateFilter: string): boolean {
   return normalizeText(report.date) === dateFilter;
 }
 
-function matchesType(report: TodayReport, typeFilter: string): boolean {
-  if (typeFilter === ALL) return true;
-  if (typeFilter === "投手") return isPitcher(report);
-  if (typeFilter === "野手") return isHitter(report);
+function matchesType(report: TodayReport, selectedTypes: string[]): boolean {
+  if (selectedTypes.length === 0) return true;
 
-  return true;
+  return (
+    (selectedTypes.includes("投手") && isPitcher(report)) ||
+    (selectedTypes.includes("野手") && isHitter(report))
+  );
 }
 
-function matchesLeague(report: TodayReport, leagueFilter: string): boolean {
-  if (leagueFilter === ALL) return true;
+function matchesLeague(
+  report: TodayReport,
+  selectedLeagues: string[]
+): boolean {
+  if (selectedLeagues.length === 0) return true;
 
-  return normalizeText(report.league) === leagueFilter;
+  return selectedLeagues.includes(normalizeText(report.league));
 }
 
-function matchesLevel(report: TodayReport, levelFilter: string): boolean {
-  if (levelFilter === ALL) return true;
+function matchesLevel(report: TodayReport, selectedLevels: string[]): boolean {
+  if (selectedLevels.length === 0) return true;
 
-  return normalizeText(report.level) === levelFilter;
+  return selectedLevels.includes(normalizeText(report.level));
 }
 
 function csvEscape(value: unknown): string {
   return `"${String(value ?? "").replace(/"/g, '""')}"`;
+}
+
+function toggleValue(values: string[], value: string): string[] {
+  if (values.includes(value)) {
+    return values.filter((item) => item !== value);
+  }
+
+  return [...values, value];
+}
+
+function CheckboxGroup({
+  title,
+  options,
+  values,
+  onChange,
+}: {
+  title: string;
+  options: string[];
+  values: string[];
+  onChange: (values: string[]) => void;
+}) {
+  return (
+    <div>
+      <p className="text-slate-400 text-sm mb-2">{title}</p>
+
+      <div className="flex flex-wrap gap-2">
+        {options.map((option) => {
+          const checked = values.includes(option);
+
+          return (
+            <label
+              key={option}
+              className={[
+                "cursor-pointer rounded-lg border px-3 py-2 text-sm transition",
+                checked
+                  ? "border-sky-500 bg-sky-500/20 text-sky-200"
+                  : "border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700",
+              ].join(" ")}
+            >
+              <input
+                type="checkbox"
+                checked={checked}
+                onChange={() => onChange(toggleValue(values, option))}
+                className="sr-only"
+              />
+              {option}
+            </label>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 function FilterSelect({
@@ -151,22 +211,37 @@ export default function TodayTable({ todayPlayers }: TodayTableProps) {
   const [dateFilter, setDateFilter] = useState(
     searchParams.get("date") || availableDates[0] || ALL
   );
-  const [typeFilter, setTypeFilter] = useState(searchParams.get("type") || ALL);
-  const [leagueFilter, setLeagueFilter] = useState(
-    searchParams.get("league") || ALL
+  const [selectedTypes, setSelectedTypes] = useState<string[]>(
+    parseMultiParam(searchParams.get("type"))
   );
-  const [levelFilter, setLevelFilter] = useState(
-    searchParams.get("level") || ALL
+  const [selectedLeagues, setSelectedLeagues] = useState<string[]>(
+    parseMultiParam(searchParams.get("league"))
+  );
+  const [selectedLevels, setSelectedLevels] = useState<string[]>(
+    parseMultiParam(searchParams.get("level"))
   );
 
-  function updateFilter(key: string, value: string) {
-    const params = new URLSearchParams(searchParams.toString());
-    const nextValue = value.trim();
+  function applyFilters() {
+    const params = new URLSearchParams();
 
-    if (nextValue === "" || nextValue === ALL) {
-      params.delete(key);
-    } else {
-      params.set(key, nextValue);
+    if (searchText.trim()) {
+      params.set("q", searchText.trim());
+    }
+
+    if (dateFilter !== ALL) {
+      params.set("date", dateFilter);
+    }
+
+    if (selectedTypes.length > 0) {
+      params.set("type", selectedTypes.join(","));
+    }
+
+    if (selectedLeagues.length > 0) {
+      params.set("league", selectedLeagues.join(","));
+    }
+
+    if (selectedLevels.length > 0) {
+      params.set("level", selectedLevels.join(","));
     }
 
     const queryString = params.toString();
@@ -181,9 +256,9 @@ export default function TodayTable({ todayPlayers }: TodayTableProps) {
 
     setSearchText("");
     setDateFilter(defaultDate);
-    setTypeFilter(ALL);
-    setLeagueFilter(ALL);
-    setLevelFilter(ALL);
+    setSelectedTypes([]);
+    setSelectedLeagues([]);
+    setSelectedLevels([]);
 
     const params = new URLSearchParams();
 
@@ -205,18 +280,18 @@ export default function TodayTable({ todayPlayers }: TodayTableProps) {
       return (
         matchesSearch(report, keyword) &&
         matchesDate(report, dateFilter) &&
-        matchesType(report, typeFilter) &&
-        matchesLeague(report, leagueFilter) &&
-        matchesLevel(report, levelFilter)
+        matchesType(report, selectedTypes) &&
+        matchesLeague(report, selectedLeagues) &&
+        matchesLevel(report, selectedLevels)
       );
     });
   }, [
     todayPlayers,
     searchText,
     dateFilter,
-    typeFilter,
-    leagueFilter,
-    levelFilter,
+    selectedTypes,
+    selectedLeagues,
+    selectedLevels,
   ]);
 
   function exportTodayCsv() {
@@ -265,13 +340,58 @@ export default function TodayTable({ todayPlayers }: TodayTableProps) {
   return (
     <>
       <details className="bg-slate-900 rounded-2xl border border-slate-800 mb-6 p-5">
-        <summary className="list-none cursor-pointer">
+        <summary className="list-none cursor-pointer inline-flex w-fit items-center rounded border border-slate-700 px-1.5 py-0 text-xs leading-5 text-slate-300 hover:bg-slate-800">
           篩選條件
         </summary>
 
-        <div className="mt-5">
+        <div className="mt-5 space-y-5">
+          <FilterSelect
+            label="日期"
+            value={dateFilter}
+            options={[ALL, ...availableDates]}
+            onChange={setDateFilter}
+          />
+
+          <label className="block">
+            <p className="text-slate-400 text-sm mb-2">搜尋</p>
+            <input
+              value={searchText}
+              onChange={(event) => setSearchText(event.target.value)}
+              placeholder="搜尋球員、球隊、對手、成績、層級..."
+              className="w-full rounded-xl bg-slate-800 border border-slate-700 p-3 text-white placeholder:text-slate-500"
+            />
+          </label>
+
+          <CheckboxGroup
+            title="類型"
+            options={TYPE_OPTIONS}
+            values={selectedTypes}
+            onChange={setSelectedTypes}
+          />
+
+          <CheckboxGroup
+            title="聯盟"
+            options={LEAGUE_OPTIONS}
+            values={selectedLeagues}
+            onChange={setSelectedLeagues}
+          />
+
+          <CheckboxGroup
+            title="層級"
+            options={LEVEL_OPTIONS}
+            values={selectedLevels}
+            onChange={setSelectedLevels}
+          />
 
           <div className="flex flex-col sm:flex-row gap-3">
+            <button
+              type="button"
+              onClick={applyFilters}
+              className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-bold text-white hover:bg-sky-500 transition"
+            >
+              套用篩選
+            </button>
+
             <button
               type="button"
               onClick={clearFilters}
@@ -283,68 +403,11 @@ export default function TodayTable({ todayPlayers }: TodayTableProps) {
             <button
               type="button"
               onClick={exportTodayCsv}
-              className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-bold text-white hover:bg-sky-500 transition"
+              className="rounded-xl bg-slate-800 px-4 py-2 text-sm font-bold text-white hover:bg-slate-700 transition"
             >
               匯出目前結果 CSV
             </button>
           </div>
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 mb-4">
-          <FilterSelect
-            label="日期"
-            value={dateFilter}
-            options={[ALL, ...availableDates]}
-            onChange={(value) => {
-              setDateFilter(value);
-              updateFilter("date", value);
-            }}
-          />
-
-          <label className="block">
-            <p className="text-slate-400 text-sm mb-2">搜尋</p>
-            <input
-              value={searchText}
-              onChange={(event) => {
-                setSearchText(event.target.value);
-                updateFilter("q", event.target.value);
-              }}
-              placeholder="搜尋球員、球隊、對手、成績、層級..."
-              className="w-full rounded-xl bg-slate-800 border border-slate-700 p-3 text-white placeholder:text-slate-500"
-            />
-          </label>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <FilterSelect
-            label="類型"
-            value={typeFilter}
-            options={TYPE_OPTIONS}
-            onChange={(value) => {
-              setTypeFilter(value);
-              updateFilter("type", value);
-            }}
-          />
-
-          <FilterSelect
-            label="聯盟"
-            value={leagueFilter}
-            options={LEAGUE_OPTIONS}
-            onChange={(value) => {
-              setLeagueFilter(value);
-              updateFilter("league", value);
-            }}
-          />
-
-          <FilterSelect
-            label="層級"
-            value={levelFilter}
-            options={LEVEL_OPTIONS}
-            onChange={(value) => {
-              setLevelFilter(value);
-              updateFilter("level", value);
-            }}
-          />
         </div>
       </details>
 
@@ -393,24 +456,40 @@ export default function TodayTable({ todayPlayers }: TodayTableProps) {
                       key={`${name}-${index}`}
                       className="border-t border-slate-800 hover:bg-slate-800/60"
                     >
-                      <td className="sticky left-0 z-30 bg-slate-900 p-3 font-medium shadow-[4px_0_8px_rgba(0,0,0,0.35)] border-r border-slate-800">
+                      <td className="sticky left-0 z-30 bg-slate-900 p-3 font-bold shadow-[4px_0_8px_rgba(0,0,0,0.35)] border-r border-slate-800">
                         <Link
-                          href={`/players/${encodeURIComponent(report.id || name)}`}
+                          href={`/players/${encodeURIComponent(
+                            report.id || name
+                          )}`}
                           className="text-sky-300 hover:text-sky-200 hover:underline"
                         >
                           {name}
                         </Link>
                       </td>
-                      <td className="p-3">{normalizeText(report.date) || "-"}</td>
-                      <td className="p-3">{normalizeText(report.type) || "-"}</td>
-                      <td className="p-3">{normalizeText(report.league) || "-"}</td>
-                      <td className="p-3">{normalizeText(report.team) || "-"}</td>
-                      <td className="p-3">{normalizeText(report.level) || "-"}</td>
-                      <td className="p-3">{normalizeText(report.result) || "-"}</td>
+                      <td className="p-3">
+                        {normalizeText(report.date) || "-"}
+                      </td>
+                      <td className="p-3">
+                        {normalizeText(report.type) || "-"}
+                      </td>
+                      <td className="p-3">
+                        {normalizeText(report.league) || "-"}
+                      </td>
+                      <td className="p-3">
+                        {normalizeText(report.team) || "-"}
+                      </td>
+                      <td className="p-3">
+                        {normalizeText(report.level) || "-"}
+                      </td>
+                      <td className="p-3">
+                        {normalizeText(report.result) || "-"}
+                      </td>
                       <td className="p-3">
                         {normalizeText(report.opponent) || "-"}
                       </td>
-                      <td className="p-3">{normalizeText(report.stats) || "-"}</td>
+                      <td className="p-3 whitespace-normal min-w-[360px]">
+                        {normalizeText(report.stats) || "-"}
+                      </td>
                     </tr>
                   );
                 })

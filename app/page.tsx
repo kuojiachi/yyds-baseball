@@ -1,7 +1,7 @@
 import SiteHeader from "@/src/components/SiteHeader";
 import { getPlayerNameOptions } from "@/src/utils/playerNameOptions";
-import { getPlayersFromExcel, getTodayReportsFromExcel } from "@/src/lib/excel";
 import Link from "next/link";
+import { getPlayersFromExcel, getTodayReportsFromExcel } from "@/src/lib/excel";
 import { getMovementClass, getStatusClass } from "@/src/utils/playerStyles";
 
 export default async function Home() {
@@ -21,7 +21,24 @@ export default async function Home() {
 
   const totalPlayers = players.length;
   const todayPlayers = todayReports.length;
-  const topTodayReports = todayReports.filter((report) => {
+  const enrichedTodayReports = todayReports.map((report) => {
+    const matchedPlayer = players.find((player) => {
+      return (
+        String(player.id || "").trim() === String(report.id || "").trim() ||
+        String(player.name || "").trim() === String(report.name || "").trim()
+      );
+    });
+
+    return {
+      ...report,
+      type: report.type || matchedPlayer?.type || "",
+      league: report.league || matchedPlayer?.league || "",
+      team: report.team || matchedPlayer?.team || "",
+      level: report.level || matchedPlayer?.level || "",
+    };
+  });
+
+  const topTodayReports = enrichedTodayReports.filter((report) => {
     const level = String(report.level || "").trim();
     const league = String(report.league || "").trim();
 
@@ -32,9 +49,11 @@ export default async function Home() {
       level === "日職一軍" ||
       level === "韓職一軍" ||
       league === "NPB" ||
-      league === "KBO"
-  );
-});
+      league === "KBO" ||
+      league === "MLB" ||
+      league === "MiLB"
+    );
+  });
 
   function countBy(items: Record<string, unknown>[], key: string) {
     return items.reduce((acc: Record<string, number>, item) => {
@@ -126,7 +145,7 @@ export default async function Home() {
         <div className="flex flex-col gap-10">
           {/* 第 1 區：三張數字卡 */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-slate-900 rounded-2xl p-6 border border-slate-800 hover:bg-slate-800/60">
+            <div className="bg-slate-900 rounded-2xl p-6 border border-slate-800">
               <p className="text-slate-400 text-sm">異動狀態</p>
               <p className="text-4xl font-bold mt-3">{movedPlayers.length}</p>
               <p className="text-slate-500 text-sm mt-2">
@@ -134,27 +153,21 @@ export default async function Home() {
               </p>
             </div>
 
-            <Link
-              href="/today"
-              className="block bg-slate-900 rounded-2xl p-6 border border-slate-800 hover:bg-slate-800/60"
-            >
+            <div className="bg-slate-900 rounded-2xl p-6 border border-slate-800">
               <p className="text-slate-400 text-sm">今日出賽球員</p>
               <p className="text-4xl font-bold mt-3">{todayPlayers}</p>
               <p className="text-slate-500 text-sm mt-2">
-                點擊查看今日出賽名單
+                今日有戰報紀錄的球員
               </p>
-            </Link>
+            </div>
 
-            <Link
-              href="/players"
-              className="block bg-slate-900 rounded-2xl p-6 border border-slate-800 hover:bg-slate-800/60"
-            >
+            <div className="bg-slate-900 rounded-2xl p-6 border border-slate-800">
               <p className="text-slate-400 text-sm">旅外含台裔球員總數</p>
               <p className="text-4xl font-bold mt-3">{totalPlayers}</p>
               <p className="text-slate-500 text-sm mt-2">
-                點擊查看完整追蹤名單
+                目前追蹤球員總數
               </p>
-            </Link>
+            </div>
           </div>
 
           {/* 第 2 區：異動球員 */}
@@ -186,8 +199,13 @@ export default async function Home() {
                       key={`${player.name}-${index}`}
                       className="border-t border-slate-800 hover:bg-slate-800/60"
                     >
-                      <td className="sticky left-0 z-10 bg-slate-900 p-3 text-left font-medium w-[140px] min-w-[140px] shadow-[4px_0_8px_rgba(0,0,0,0.35)] border-r border-slate-800">
-                        {String(player.name ?? "-")}
+                      <td className="sticky left-0 z-10 bg-slate-900 p-3 text-left font-bold w-[140px] min-w-[140px] shadow-[4px_0_8px_rgba(0,0,0,0.35)] border-r border-slate-800">
+                        <Link
+                          href={`/players/${encodeURIComponent(String(player.id || player.name || ""))}`}
+                          className="text-sky-300 hover:text-sky-200 hover:underline"
+                        >
+                          {String(player.name ?? "-")}
+                        </Link>
                       </td>
 
                       <td className="p-3 text-left w-[140px] min-w-[140px]">
@@ -224,9 +242,9 @@ export default async function Home() {
           {/* 第 3 區：今日戰報 */}
           <div className="bg-slate-900 rounded-2xl border border-slate-700 overflow-hidden shadow-xl shadow-black/30">            
             <div className="p-5 border-b border-slate-800">
-              <h2 className="text-xl font-bold">今日戰報｜2A 以上</h2>
+              <h2 className="text-xl font-bold">今日戰報|2A以上球員</h2>
               <p className="text-slate-400 text-sm mt-1">
-                只顯示 MLB、NPB、KBO、3A、2A
+                只顯示 MLB、NPB、KBO、3A、2A 
               </p>
             </div>
 
@@ -250,9 +268,15 @@ export default async function Home() {
                       key={`${report.name}-${index}`}
                       className="border-t border-slate-800 hover:bg-slate-800/60"
                     >
-                      <td className="sticky left-0 z-10 bg-slate-900 p-3 text-left font-medium w-[140px] min-w-[140px] shadow-[4px_0_8px_rgba(0,0,0,0.35)] border-r border-slate-800">
-                        {String(report.name ?? "-")}
+                      <td className="sticky left-0 z-10 bg-slate-900 p-3 text-left font-bold w-[140px] min-w-[140px] shadow-[4px_0_8px_rgba(0,0,0,0.35)] border-r border-slate-800">
+                        <Link
+                          href={`/players/${encodeURIComponent(String(report.id || report.name || ""))}`}
+                          className="text-sky-300 hover:text-sky-200 hover:underline"
+                        >
+                          {String(report.name ?? "-")}
+                        </Link>
                       </td>
+                      
                       <td className="p-3 text-left w-[140px] min-w-[140px]">{String(report.team ?? "-")}</td>
                       <td className="p-3 text-center w-[80px] min-w-[80px]">{String(report.level ?? "-")}</td>
                       <td className="p-3 text-left whitespace-nowrap">

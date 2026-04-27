@@ -95,7 +95,22 @@ export type TodayReport = {
 
 function valueToString(value: unknown): string {
   if (value === undefined || value === null) return "";
-  return String(value).trim();
+
+  const text = String(value).trim();
+
+  const excelErrors = new Set([
+    "#NAME?",
+    "#VALUE!",
+    "#REF!",
+    "#N/A",
+    "#DIV/0!",
+    "#NUM!",
+    "#NULL!",
+  ]);
+
+  if (excelErrors.has(text)) return "";
+
+  return text;
 }
 
 function getRowValue(row: Record<string, unknown>, possibleKeys: string[]): string {
@@ -283,6 +298,7 @@ export async function getTodayReportsFromExcel(): Promise<TodayReport[]> {
     valueToString(headerRow[1]) === "球員";
 
   const dataRows = rows.slice(headerRowIndex + 1);
+  const players = await getPlayersFromExcel();
 
   return dataRows
     .map((row) => {
@@ -297,14 +313,30 @@ export async function getTodayReportsFromExcel(): Promise<TodayReport[]> {
       const opponent = hasDateColumn ? valueToString(row[8]) : valueToString(row[6]);
       const stats = hasDateColumn ? valueToString(row[9]) : valueToString(row[7]);
 
+      const matchedPlayer = players.find((player) => {
+        const playerId = valueToString(player.id);
+        const playerName = valueToString(player.name);
+
+        return (
+          (id && playerId === id) ||
+          (name && playerName === name)
+        );
+      });
+
+      const resolvedId = id || matchedPlayer?.id || "";
+      const resolvedType = position || matchedPlayer?.type || "";
+      const resolvedLeague = category || matchedPlayer?.league || "";
+      const resolvedTeam = team || matchedPlayer?.team || "";
+      const resolvedLevel = level || matchedPlayer?.level || "";
+
       return {
         date,
         name,
-        id,
-        type: position,
-        league: normalizeLeague(category),
-        team,
-        level,
+        id: resolvedId,
+        type: resolvedType,
+        league: normalizeLeague(resolvedLeague),
+        team: resolvedTeam,
+        level: resolvedLevel,
         result,
         opponent: opponent || "-",
         stats: stats || "-",

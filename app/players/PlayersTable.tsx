@@ -12,12 +12,9 @@ type PlayersTableProps = {
   players: Player[];
 };
 
-const ALL = "全部";
-
-const TYPE_OPTIONS = [ALL, "投手", "野手"];
-const LEAGUE_OPTIONS = [ALL, "美職", "日職", "韓職", "台裔", "其他"];
+const TYPE_OPTIONS = ["投手", "野手"];
+const LEAGUE_OPTIONS = ["美職", "日職", "韓職", "台裔", "其他"];
 const LEVEL_OPTIONS = [
-  ALL,
   "MLB",
   "3A",
   "2A",
@@ -28,7 +25,7 @@ const LEVEL_OPTIONS = [
   "日職二軍",
   "韓職一軍",
 ];
-const STATUS_OPTIONS = [ALL, "現役", "傷兵", "異動"];
+const STATUS_OPTIONS = ["現役", "傷兵", "異動"];
 
 function normalizeText(value: unknown): string {
   return String(value ?? "").trim();
@@ -36,6 +33,15 @@ function normalizeText(value: unknown): string {
 
 function normalizeSearchText(value: unknown): string {
   return normalizeText(value).toLowerCase();
+}
+
+function parseMultiParam(value: string | null): string[] {
+  if (!value) return [];
+
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 function normalizePlayerType(type: unknown): string {
@@ -102,69 +108,99 @@ function matchesSearch(player: Player, keyword: string): boolean {
   return searchableText.includes(keyword);
 }
 
-function matchesType(player: Player, typeFilter: string): boolean {
-  if (typeFilter === ALL) return true;
-  if (typeFilter === "投手") return isPitcher(player);
-  if (typeFilter === "野手") return isHitter(player);
+function matchesType(player: Player, selectedTypes: string[]): boolean {
+  if (selectedTypes.length === 0) return true;
 
-  return true;
+  return (
+    (selectedTypes.includes("投手") && isPitcher(player)) ||
+    (selectedTypes.includes("野手") && isHitter(player))
+  );
 }
 
-function matchesLeague(player: Player, leagueFilter: string): boolean {
-  if (leagueFilter === ALL) return true;
+function matchesLeague(player: Player, selectedLeagues: string[]): boolean {
+  if (selectedLeagues.length === 0) return true;
 
-  return normalizeLeague(player.league) === leagueFilter;
+  return selectedLeagues.includes(normalizeLeague(player.league));
 }
 
-function matchesLevel(player: Player, levelFilter: string): boolean {
-  if (levelFilter === ALL) return true;
+function matchesLevel(player: Player, selectedLevels: string[]): boolean {
+  if (selectedLevels.length === 0) return true;
 
-  return normalizeText(player.level) === levelFilter;
+  return selectedLevels.includes(normalizeText(player.level));
 }
 
-function matchesStatus(player: Player, statusFilter: string): boolean {
-  if (statusFilter === ALL) return true;
+function matchesStatus(player: Player, selectedStatuses: string[]): boolean {
+  if (selectedStatuses.length === 0) return true;
 
   const status = normalizeText(player.status);
-  const statusText = `${normalizeText(player.status)} ${normalizeText(player.note)}`;
+  const statusText = `${normalizeText(player.status)} ${normalizeText(
+    player.note
+  )}`;
 
-  if (statusFilter === "現役") return status === "現役";
-  if (statusFilter === "傷兵") return statusText.includes("傷");
-  if (statusFilter === "異動") {
-    return hasValue(player.movement) || hasValue(player.note);
-  }
+  return selectedStatuses.some((selectedStatus) => {
+    if (selectedStatus === "現役") return status === "現役";
+    if (selectedStatus === "傷兵") return statusText.includes("傷");
+    if (selectedStatus === "異動") {
+      return hasValue(player.movement) || hasValue(player.note);
+    }
 
-  return true;
+    return false;
+  });
 }
 
 function csvEscape(value: unknown): string {
   return `"${String(value ?? "").replace(/"/g, '""')}"`;
 }
 
-function FilterSelect({
-  label,
-  value,
+function toggleValue(values: string[], value: string): string[] {
+  if (values.includes(value)) {
+    return values.filter((item) => item !== value);
+  }
+
+  return [...values, value];
+}
+
+function CheckboxGroup({
+  title,
   options,
+  values,
   onChange,
 }: {
-  label: string;
-  value: string;
+  title: string;
   options: string[];
-  onChange: (value: string) => void;
+  values: string[];
+  onChange: (values: string[]) => void;
 }) {
   return (
-    <label className="block">
-      <p className="text-slate-400 text-sm mb-2">{label}</p>
-      <select
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded-xl bg-slate-800 border border-slate-700 p-3 text-white"
-      >
-        {options.map((option) => (
-          <option key={option}>{option}</option>
-        ))}
-      </select>
-    </label>
+    <div>
+      <p className="text-slate-400 text-sm mb-2">{title}</p>
+
+      <div className="flex flex-wrap gap-2">
+        {options.map((option) => {
+          const checked = values.includes(option);
+
+          return (
+            <label
+              key={option}
+              className={[
+                "cursor-pointer rounded-lg border px-3 py-2 text-sm transition",
+                checked
+                  ? "border-sky-500 bg-sky-500/20 text-sky-200"
+                  : "border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700",
+              ].join(" ")}
+            >
+              <input
+                type="checkbox"
+                checked={checked}
+                onChange={() => onChange(toggleValue(values, option))}
+                className="sr-only"
+              />
+              {option}
+            </label>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -173,25 +209,40 @@ export default function PlayersTable({ players }: PlayersTableProps) {
   const searchParams = useSearchParams();
 
   const [searchText, setSearchText] = useState(searchParams.get("q") || "");
-  const [typeFilter, setTypeFilter] = useState(searchParams.get("type") || ALL);
-  const [leagueFilter, setLeagueFilter] = useState(
-    searchParams.get("league") || ALL
+  const [selectedTypes, setSelectedTypes] = useState<string[]>(
+    parseMultiParam(searchParams.get("type"))
   );
-  const [levelFilter, setLevelFilter] = useState(
-    searchParams.get("level") || ALL
+  const [selectedLeagues, setSelectedLeagues] = useState<string[]>(
+    parseMultiParam(searchParams.get("league"))
   );
-  const [statusFilter, setStatusFilter] = useState(
-    searchParams.get("status") || ALL
+  const [selectedLevels, setSelectedLevels] = useState<string[]>(
+    parseMultiParam(searchParams.get("level"))
+  );
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>(
+    parseMultiParam(searchParams.get("status"))
   );
 
-  function updateFilter(key: string, value: string) {
-    const params = new URLSearchParams(searchParams.toString());
-    const nextValue = value.trim();
+  function applyFilters() {
+    const params = new URLSearchParams();
 
-    if (nextValue === "" || nextValue === ALL) {
-      params.delete(key);
-    } else {
-      params.set(key, nextValue);
+    if (searchText.trim()) {
+      params.set("q", searchText.trim());
+    }
+
+    if (selectedTypes.length > 0) {
+      params.set("type", selectedTypes.join(","));
+    }
+
+    if (selectedLeagues.length > 0) {
+      params.set("league", selectedLeagues.join(","));
+    }
+
+    if (selectedLevels.length > 0) {
+      params.set("level", selectedLevels.join(","));
+    }
+
+    if (selectedStatuses.length > 0) {
+      params.set("status", selectedStatuses.join(","));
     }
 
     const queryString = params.toString();
@@ -203,10 +254,10 @@ export default function PlayersTable({ players }: PlayersTableProps) {
 
   function clearFilters() {
     setSearchText("");
-    setTypeFilter(ALL);
-    setLeagueFilter(ALL);
-    setLevelFilter(ALL);
-    setStatusFilter(ALL);
+    setSelectedTypes([]);
+    setSelectedLeagues([]);
+    setSelectedLevels([]);
+    setSelectedStatuses([]);
 
     router.replace("/players", { scroll: false });
   }
@@ -218,14 +269,21 @@ export default function PlayersTable({ players }: PlayersTableProps) {
       players.filter((player) => {
         return (
           matchesSearch(player, keyword) &&
-          matchesType(player, typeFilter) &&
-          matchesLeague(player, leagueFilter) &&
-          matchesLevel(player, levelFilter) &&
-          matchesStatus(player, statusFilter)
+          matchesType(player, selectedTypes) &&
+          matchesLeague(player, selectedLeagues) &&
+          matchesLevel(player, selectedLevels) &&
+          matchesStatus(player, selectedStatuses)
         );
       })
     );
-  }, [players, searchText, typeFilter, leagueFilter, levelFilter, statusFilter]);
+  }, [
+    players,
+    searchText,
+    selectedTypes,
+    selectedLeagues,
+    selectedLevels,
+    selectedStatuses,
+  ]);
 
   function exportPlayersCsv() {
     const headers = [
@@ -273,13 +331,58 @@ export default function PlayersTable({ players }: PlayersTableProps) {
   return (
     <>
       <details className="bg-slate-900 rounded-2xl border border-slate-800 mb-6 p-5">
-        <summary className="list-none cursor-pointer">
+        <summary className="list-none cursor-pointer inline-flex w-fit items-center rounded border border-slate-700 px-1.5 py-0 text-xs leading-5 text-slate-300 hover:bg-slate-800">
           篩選條件
         </summary>
 
-        <div className="mt-5">
+        <div className="mt-5 space-y-5">
+          <label className="block">
+            <p className="text-slate-400 text-sm mb-2">搜尋</p>
+            <input
+              value={searchText}
+              onChange={(event) => setSearchText(event.target.value)}
+              placeholder="搜尋球員、球隊、層級、分類、守位..."
+              className="w-full rounded-xl bg-slate-800 border border-slate-700 p-3 text-white placeholder:text-slate-500"
+            />
+          </label>
+
+          <CheckboxGroup
+            title="類型"
+            options={TYPE_OPTIONS}
+            values={selectedTypes}
+            onChange={setSelectedTypes}
+          />
+
+          <CheckboxGroup
+            title="聯盟"
+            options={LEAGUE_OPTIONS}
+            values={selectedLeagues}
+            onChange={setSelectedLeagues}
+          />
+
+          <CheckboxGroup
+            title="層級"
+            options={LEVEL_OPTIONS}
+            values={selectedLevels}
+            onChange={setSelectedLevels}
+          />
+
+          <CheckboxGroup
+            title="狀態"
+            options={STATUS_OPTIONS}
+            values={selectedStatuses}
+            onChange={setSelectedStatuses}
+          />
 
           <div className="flex flex-col sm:flex-row gap-3">
+            <button
+              type="button"
+              onClick={applyFilters}
+              className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-bold text-white hover:bg-sky-500 transition"
+            >
+              套用篩選
+            </button>
+
             <button
               type="button"
               onClick={clearFilters}
@@ -291,66 +394,11 @@ export default function PlayersTable({ players }: PlayersTableProps) {
             <button
               type="button"
               onClick={exportPlayersCsv}
-              className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-bold text-white hover:bg-sky-500 transition"
+              className="rounded-xl bg-slate-800 px-4 py-2 text-sm font-bold text-white hover:bg-slate-700 transition"
             >
               匯出目前結果 CSV
             </button>
           </div>
-        </div>
-
-        <label className="block mb-4">
-          <p className="text-slate-400 text-sm mb-2">搜尋</p>
-          <input
-            value={searchText}
-            onChange={(event) => {
-              setSearchText(event.target.value);
-              updateFilter("q", event.target.value);
-            }}
-            placeholder="搜尋球員、球隊、層級、分類、守位..."
-            className="w-full rounded-xl bg-slate-800 border border-slate-700 p-3 text-white placeholder:text-slate-500"
-          />
-        </label>
-
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <FilterSelect
-            label="類型"
-            value={typeFilter}
-            options={TYPE_OPTIONS}
-            onChange={(value) => {
-              setTypeFilter(value);
-              updateFilter("type", value);
-            }}
-          />
-
-          <FilterSelect
-            label="聯盟"
-            value={leagueFilter}
-            options={LEAGUE_OPTIONS}
-            onChange={(value) => {
-              setLeagueFilter(value);
-              updateFilter("league", value);
-            }}
-          />
-
-          <FilterSelect
-            label="層級"
-            value={levelFilter}
-            options={LEVEL_OPTIONS}
-            onChange={(value) => {
-              setLevelFilter(value);
-              updateFilter("level", value);
-            }}
-          />
-
-          <FilterSelect
-            label="狀態"
-            value={statusFilter}
-            options={STATUS_OPTIONS}
-            onChange={(value) => {
-              setStatusFilter(value);
-              updateFilter("status", value);
-            }}
-          />
         </div>
       </details>
 
@@ -395,16 +443,19 @@ export default function PlayersTable({ players }: PlayersTableProps) {
                   const name = normalizeText(player.name) || "-";
                   const movement = normalizeText(player.movement) || "-";
                   const statusText = normalizeText(player.note);
-                  const hasStatusChange = statusText !== "" && statusText !== "-";
+                  const hasStatusChange =
+                    statusText !== "" && statusText !== "-";
 
                   return (
                     <tr
                       key={`${name}-${index}`}
                       className="border-t border-slate-800 hover:bg-slate-800/60"
                     >
-                      <td className="sticky left-0 z-30 bg-slate-900 p-3 text-left font-medium border-r border-slate-800">
+                      <td className="sticky left-0 z-30 bg-slate-900 p-3 text-left font-bold border-r border-slate-800">
                         <Link
-                          href={`/players/${encodeURIComponent(player.id || name)}`}
+                          href={`/players/${encodeURIComponent(
+                            player.id || name
+                          )}`}
                           className="text-sky-300 hover:text-sky-200 hover:underline"
                         >
                           {name}
