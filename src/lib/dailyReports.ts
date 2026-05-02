@@ -9,6 +9,7 @@ export async function getDailyReports() {
       report_date,
       position,
       result,
+      stats,
       ab,
       r,
       h,

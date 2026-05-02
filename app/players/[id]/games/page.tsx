@@ -104,7 +104,7 @@ export default async function GamesPage({ params }: PageProps) {
                   </div>
 
                   <div className="text-lg font-bold text-white">
-                    {displayValue(report.result || report.stats || "出賽")}
+                    {displayValue(report.stats)}
                   </div>
                 </div>
               ))}

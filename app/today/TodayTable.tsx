@@ -94,8 +94,11 @@ function formatDate(date: unknown): string {
 }
 
 function getStats(report: TodayReport): string {
-  if (report.result) return normalizeText(report.result);
-  return "-";
+  const stats = normalizeText(report.stats);
+
+  if (!stats || stats === "-") return "-";
+
+  return stats;
 }
 
 function isPitcher(report: TodayReport): boolean {
@@ -115,6 +118,26 @@ function isHitter(report: TodayReport): boolean {
     type.includes("batter") ||
     type === "h"
   );
+}
+
+function formatResultText(text: unknown): string {
+  const v = normalizeText(text);
+  if (!v) return "-";
+
+  return v
+    .replace(/AVG\.?(\d+)/g, "AVG 0.$1")
+    .replace(/OBP\.?(\d+)/g, "OBP 0.$1")
+    .replace(/SLG\.?(\d+)/g, "SLG 0.$1")
+    .replace(/AVG\s+(\d+\.\d+)/g, "AVG $1")
+    .replace(/OBP\s+(\d+\.\d+)/g, "OBP $1")
+    .replace(/SLG\s+(\d+\.\d+)/g, "SLG $1")
+    .replace(/\s*ERA\s*([0-9.]+)/g, "，ERA $1")
+    .replace(/\s*WHIP\s*([0-9.]+)/g, "，WHIP $1")
+    .replace(/\s+/g, " ")
+    .replace(/，/g, "｜")
+    .replace(/\s*，\s*/g, "｜")
+    .replace(/｜\s*｜/g, "｜")
+    .replace(/\s*｜\s*/g, "｜");
 }
 
 function matchesSearch(report: TodayReport, keyword: string): boolean {
@@ -265,6 +288,7 @@ export default function TodayTable({ todayPlayers }: TodayTableProps) {
     return todayPlayers
       .filter((report) => {
         return (
+          getStats(report) !== "-" &&
           matchesSearch(report, keyword) &&
           matchesDate(report, dateFilter) &&
           matchesType(report, selectedTypes) &&
@@ -377,11 +401,11 @@ export default function TodayTable({ todayPlayers }: TodayTableProps) {
                 <th className="bg-slate-800 text-left p-3">日期</th>
                 <th className="bg-slate-800 text-left p-3">守位</th>
                 <th className="bg-slate-800 text-left p-3">聯盟</th>
-                <th className="bg-slate-800 text-right p-3">球隊</th>
+                <th className="bg-slate-800 text-left p-3">球隊</th>
                 <th className="bg-slate-800 text-left p-3">層級</th>
                 <th className="bg-slate-800 text-left p-3">結果</th>
-                <th className="bg-slate-800 text-right p-3">對手</th>
-                <th className="bg-slate-800 text-right p-3">成績</th>
+                <th className="bg-slate-800 text-left p-3">對手</th>
+                <th className="bg-slate-800 text-left p-3">成績</th>
               </tr>
             </thead>
 
@@ -412,11 +436,17 @@ export default function TodayTable({ todayPlayers }: TodayTableProps) {
                       <td className="p-3 text-left">{formatDate(report.report_date)}</td>
                       <td className="p-3 text-left">{normalizeText(report.position) || "-"}</td>
                       <td className="p-3 text-left">{getPlayerLeague(report) || "-"}</td>
-                      <td className="p-3 text-right">{getPlayerTeam(report) || "-"}</td>
+                      <td className="p-3 text-left">{getPlayerTeam(report) || "-"}</td>
                       <td className="p-3 text-left">{getPlayerLevel(report) || "-"}</td>
-                      <td className="p-3 text-left">{normalizeText(report.result) || "-"}</td>
-                      <td className="p-3 text-right">{normalizeText(report.opponent) || "-"}</td>
-                      <td className="p-3 text-right whitespace-normal min-w-[260px]">{getStats(report) || "-"}</td>
+
+                      <td className="p-3 text-left">
+                        {normalizeText(report.result) || "-"}
+                      </td>
+
+                      <td className="p-3 text-left">{normalizeText(report.opponent) || "-"}</td>
+                      <td className="p-3 text-left whitespace-normal min-w-[360px]">
+                        {formatResultText(getStats(report))}
+                      </td>
                     </tr>
                   );
                 })
