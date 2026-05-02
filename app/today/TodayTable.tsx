@@ -4,27 +4,33 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-import type { TodayReport } from "@/src/lib/excel";
+type TodayReport = any;
 
 type TodayTableProps = {
   todayPlayers: TodayReport[];
 };
 
 const ALL = "全部";
-
 const TYPE_OPTIONS = ["投手", "野手"];
-const LEAGUE_OPTIONS = ["MLB", "MiLB", "NPB", "KBO", "其他"];
-const LEVEL_OPTIONS = [
-  "MLB",
-  "3A",
-  "2A",
-  "A+",
-  "1A",
-  "RK",
-  "日職一軍",
-  "日職二軍",
-  "韓職一軍",
-];
+const LEAGUE_OPTIONS = ["MLB", "MiLB", "NPB", "KBO", "美職", "日職", "韓職", "其他"];
+const LEVEL_OPTIONS = ["MLB", "3A", "2A", "A+", "1A", "RK", "日職一軍", "日職二軍", "韓職一軍"];
+const LEVEL_ORDER: Record<string, number> = {
+  MLB: 1,
+  "3A": 2,
+  AAA: 2,
+  "2A": 3,
+  AA: 3,
+  "A+": 4,
+  "1A": 5,
+  RK: 6,
+  "日職一軍": 7,
+  "日職二軍": 8,
+  "韓職一軍": 9,
+};
+
+function levelRank(level: unknown) {
+  return LEVEL_ORDER[String(level ?? "").trim()] ?? 999;
+}
 
 function normalizeText(value: unknown): string {
   return String(value ?? "").trim();
@@ -36,22 +42,69 @@ function normalizeSearchText(value: unknown): string {
 
 function parseMultiParam(value: string | null): string[] {
   if (!value) return [];
+  return value.split(",").map((item) => item.trim()).filter(Boolean);
+}
 
-  return value
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
+function getPlayerName(report: TodayReport): string {
+  return Array.isArray(report.players)
+    ? normalizeText(report.players[0]?.name_zh)
+    : normalizeText(report.players?.name_zh);
+}
+
+function getPlayerId(report: TodayReport): string {
+  return normalizeText(report.player_id || report.players?.id);
+}
+
+function getPlayerLeague(report: TodayReport): string {
+  if (Array.isArray(report.players)) {
+    return normalizeText(report.players[0]?.league);
+  }
+
+  return normalizeText(report.players?.league || report.league);
+}
+
+function getPlayerLevel(report: TodayReport): string {
+  if (Array.isArray(report.players)) {
+    return normalizeText(report.players[0]?.level);
+  }
+
+  return normalizeText(report.players?.level || report.level);
+}
+
+function getPlayerTeam(report: TodayReport): string {
+  if (Array.isArray(report.players)) {
+    return normalizeText(
+      report.players[0]?.team_name ||
+      report.players[0]?.teams?.name_zh ||
+      report.players[0]?.teams?.abbreviation
+    );
+  }
+
+  return normalizeText(
+    report.team ||
+    report.team_name ||
+    report.players?.team_name
+  );
+}
+
+function formatDate(date: unknown): string {
+  const text = normalizeText(date);
+  if (!text) return "-";
+  return text.slice(0, 10);
+}
+
+function getStats(report: TodayReport): string {
+  if (report.result) return normalizeText(report.result);
+  return "-";
 }
 
 function isPitcher(report: TodayReport): boolean {
-  const type = normalizeText(report.type).toLowerCase();
-
+  const type = normalizeText(report.position).toLowerCase();
   return type.includes("投") || type.includes("pitcher") || type === "p";
 }
 
 function isHitter(report: TodayReport): boolean {
-  const type = normalizeText(report.type).toLowerCase();
-
+  const type = normalizeText(report.position).toLowerCase();
   return (
     type.includes("野") ||
     type.includes("外") ||
@@ -68,15 +121,15 @@ function matchesSearch(report: TodayReport, keyword: string): boolean {
   if (!keyword) return true;
 
   const searchableText = [
-    report.date,
-    report.name,
-    report.type,
-    report.league,
-    report.team,
-    report.level,
+    formatDate(report.report_date),
+    getPlayerName(report),
+    report.position,
+    getPlayerLeague(report),
+    getPlayerTeam(report),
+    getPlayerLevel(report),
     report.result,
     report.opponent,
-    report.stats,
+    getStats(report),
   ]
     .map(normalizeSearchText)
     .join(" ");
@@ -86,8 +139,7 @@ function matchesSearch(report: TodayReport, keyword: string): boolean {
 
 function matchesDate(report: TodayReport, dateFilter: string): boolean {
   if (dateFilter === ALL) return true;
-
-  return normalizeText(report.date) === dateFilter;
+  return formatDate(report.report_date) === dateFilter;
 }
 
 function matchesType(report: TodayReport, selectedTypes: string[]): boolean {
@@ -99,19 +151,14 @@ function matchesType(report: TodayReport, selectedTypes: string[]): boolean {
   );
 }
 
-function matchesLeague(
-  report: TodayReport,
-  selectedLeagues: string[]
-): boolean {
+function matchesLeague(report: TodayReport, selectedLeagues: string[]): boolean {
   if (selectedLeagues.length === 0) return true;
-
-  return selectedLeagues.includes(normalizeText(report.league));
+  return selectedLeagues.includes(getPlayerLeague(report));
 }
 
 function matchesLevel(report: TodayReport, selectedLevels: string[]): boolean {
   if (selectedLevels.length === 0) return true;
-
-  return selectedLevels.includes(normalizeText(report.level));
+  return selectedLevels.includes(getPlayerLevel(report));
 }
 
 function csvEscape(value: unknown): string {
@@ -119,11 +166,9 @@ function csvEscape(value: unknown): string {
 }
 
 function toggleValue(values: string[], value: string): string[] {
-  if (values.includes(value)) {
-    return values.filter((item) => item !== value);
-  }
-
-  return [...values, value];
+  return values.includes(value)
+    ? values.filter((item) => item !== value)
+    : [...values, value];
 }
 
 function CheckboxGroup({
@@ -140,7 +185,6 @@ function CheckboxGroup({
   return (
     <div>
       <p className="text-slate-400 text-sm mb-2">{title}</p>
-
       <div className="flex flex-wrap gap-2">
         {options.map((option) => {
           const checked = values.includes(option);
@@ -170,82 +214,32 @@ function CheckboxGroup({
   );
 }
 
-function FilterSelect({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  options: string[];
-  onChange: (value: string) => void;
-}) {
-  return (
-    <label className="block">
-      <p className="text-slate-400 text-sm mb-2">{label}</p>
-      <select
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded-xl bg-slate-800 border border-slate-700 p-3 text-white"
-      >
-        {options.map((option) => (
-          <option key={option}>{option}</option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
 export default function TodayTable({ todayPlayers }: TodayTableProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
   const availableDates = useMemo(() => {
     return Array.from(
-      new Set(todayPlayers.map((report) => report.date).filter(Boolean))
-    ).sort((a, b) => b.localeCompare(a));
+      new Set(todayPlayers.map((report) => formatDate(report.report_date)).filter((date) => date !== "-"))
+    ).sort((a, b) => String(b).localeCompare(String(a)));
   }, [todayPlayers]);
 
   const [searchText, setSearchText] = useState(searchParams.get("q") || "");
-  const [dateFilter, setDateFilter] = useState(
-    searchParams.get("date") || availableDates[0] || ALL
-  );
-  const [selectedTypes, setSelectedTypes] = useState<string[]>(
-    parseMultiParam(searchParams.get("type"))
-  );
-  const [selectedLeagues, setSelectedLeagues] = useState<string[]>(
-    parseMultiParam(searchParams.get("league"))
-  );
-  const [selectedLevels, setSelectedLevels] = useState<string[]>(
-    parseMultiParam(searchParams.get("level"))
-  );
+  const [dateFilter, setDateFilter] = useState(searchParams.get("date") || ALL);
+  const [selectedTypes, setSelectedTypes] = useState<string[]>(parseMultiParam(searchParams.get("type")));
+  const [selectedLeagues, setSelectedLeagues] = useState<string[]>(parseMultiParam(searchParams.get("league")));
+  const [selectedLevels, setSelectedLevels] = useState<string[]>(parseMultiParam(searchParams.get("level")));
 
   function applyFilters() {
     const params = new URLSearchParams();
 
-    if (searchText.trim()) {
-      params.set("q", searchText.trim());
-    }
-
-    if (dateFilter !== ALL) {
-      params.set("date", dateFilter);
-    }
-
-    if (selectedTypes.length > 0) {
-      params.set("type", selectedTypes.join(","));
-    }
-
-    if (selectedLeagues.length > 0) {
-      params.set("league", selectedLeagues.join(","));
-    }
-
-    if (selectedLevels.length > 0) {
-      params.set("level", selectedLevels.join(","));
-    }
+    if (searchText.trim()) params.set("q", searchText.trim());
+    if (dateFilter !== ALL) params.set("date", dateFilter);
+    if (selectedTypes.length > 0) params.set("type", selectedTypes.join(","));
+    if (selectedLeagues.length > 0) params.set("league", selectedLeagues.join(","));
+    if (selectedLevels.length > 0) params.set("level", selectedLevels.join(","));
 
     const queryString = params.toString();
-
     router.replace(queryString ? `/today?${queryString}` : "/today", {
       scroll: false,
     });
@@ -260,15 +254,7 @@ export default function TodayTable({ todayPlayers }: TodayTableProps) {
     setSelectedLeagues([]);
     setSelectedLevels([]);
 
-    const params = new URLSearchParams();
-
-    if (defaultDate !== ALL) {
-      params.set("date", defaultDate);
-    }
-
-    const queryString = params.toString();
-
-    router.replace(queryString ? `/today?${queryString}` : "/today", {
+    router.replace(defaultDate !== ALL ? `/today?date=${defaultDate}` : "/today", {
       scroll: false,
     });
   }
@@ -276,52 +262,37 @@ export default function TodayTable({ todayPlayers }: TodayTableProps) {
   const filteredTodayPlayers = useMemo(() => {
     const keyword = normalizeSearchText(searchText);
 
-    return todayPlayers.filter((report) => {
-      return (
-        matchesSearch(report, keyword) &&
-        matchesDate(report, dateFilter) &&
-        matchesType(report, selectedTypes) &&
-        matchesLeague(report, selectedLeagues) &&
-        matchesLevel(report, selectedLevels)
-      );
-    });
-  }, [
-    todayPlayers,
-    searchText,
-    dateFilter,
-    selectedTypes,
-    selectedLeagues,
-    selectedLevels,
-  ]);
+    return todayPlayers
+      .filter((report) => {
+        return (
+          matchesSearch(report, keyword) &&
+          matchesDate(report, dateFilter) &&
+          matchesType(report, selectedTypes) &&
+          matchesLeague(report, selectedLeagues) &&
+          matchesLevel(report, selectedLevels)
+        );
+      })
+      .sort((a, b) => {
+        return levelRank(getPlayerLevel(a)) - levelRank(getPlayerLevel(b));
+      });
+  }, [todayPlayers, searchText, dateFilter, selectedTypes, selectedLeagues, selectedLevels]);
 
   function exportTodayCsv() {
-    const headers = [
-      "日期",
-      "球員",
-      "類型",
-      "聯盟",
-      "球隊",
-      "層級",
-      "結果",
-      "對手",
-      "成績",
-    ];
+    const headers = ["日期", "球員", "守位", "聯盟", "球隊", "層級", "結果", "對手", "成績"];
 
     const rows = filteredTodayPlayers.map((report) => [
-      report.date,
-      report.name,
-      report.type,
-      report.league,
-      report.team,
-      report.level,
+      formatDate(report.report_date),
+      getPlayerName(report),
+      report.position,
+      getPlayerLeague(report),
+      getPlayerTeam(report),
+      getPlayerLevel(report),
       report.result,
       report.opponent,
-      report.stats,
+      getStats(report),
     ]);
 
-    const csvContent = [headers, ...rows]
-      .map((row) => row.map(csvEscape).join(","))
-      .join("\n");
+    const csvContent = [headers, ...rows].map((row) => row.map(csvEscape).join(",")).join("\n");
 
     const blob = new Blob(["\uFEFF" + csvContent], {
       type: "text/csv;charset=utf-8;",
@@ -331,7 +302,7 @@ export default function TodayTable({ todayPlayers }: TodayTableProps) {
     const link = document.createElement("a");
 
     link.href = url;
-    link.download = "TWDS_今日戰報篩選結果.csv";
+    link.download = "TWDS_球員出賽紀錄篩選結果.csv";
     link.click();
 
     URL.revokeObjectURL(url);
@@ -345,12 +316,18 @@ export default function TodayTable({ todayPlayers }: TodayTableProps) {
         </summary>
 
         <div className="mt-5 space-y-5">
-          <FilterSelect
-            label="日期"
-            value={dateFilter}
-            options={[ALL, ...availableDates]}
-            onChange={setDateFilter}
-          />
+          <label className="block">
+            <p className="text-slate-400 text-sm mb-2">日期</p>
+            <select
+              value={dateFilter}
+              onChange={(event) => setDateFilter(event.target.value)}
+              className="w-full rounded-xl bg-slate-800 border border-slate-700 p-3 text-white"
+            >
+              {[ALL, ...availableDates].map((option) => (
+                <option key={option}>{option}</option>
+              ))}
+            </select>
+          </label>
 
           <label className="block">
             <p className="text-slate-400 text-sm mb-2">搜尋</p>
@@ -362,49 +339,20 @@ export default function TodayTable({ todayPlayers }: TodayTableProps) {
             />
           </label>
 
-          <CheckboxGroup
-            title="類型"
-            options={TYPE_OPTIONS}
-            values={selectedTypes}
-            onChange={setSelectedTypes}
-          />
-
-          <CheckboxGroup
-            title="聯盟"
-            options={LEAGUE_OPTIONS}
-            values={selectedLeagues}
-            onChange={setSelectedLeagues}
-          />
-
-          <CheckboxGroup
-            title="層級"
-            options={LEVEL_OPTIONS}
-            values={selectedLevels}
-            onChange={setSelectedLevels}
-          />
+          <CheckboxGroup title="類型" options={TYPE_OPTIONS} values={selectedTypes} onChange={setSelectedTypes} />
+          <CheckboxGroup title="聯盟" options={LEAGUE_OPTIONS} values={selectedLeagues} onChange={setSelectedLeagues} />
+          <CheckboxGroup title="層級" options={LEVEL_OPTIONS} values={selectedLevels} onChange={setSelectedLevels} />
 
           <div className="flex flex-col sm:flex-row gap-3">
-            <button
-              type="button"
-              onClick={applyFilters}
-              className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-bold text-white hover:bg-sky-500 transition"
-            >
+            <button type="button" onClick={applyFilters} className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-bold text-white hover:bg-sky-500 transition">
               套用篩選
             </button>
 
-            <button
-              type="button"
-              onClick={clearFilters}
-              className="rounded-xl bg-slate-800 px-4 py-2 text-sm font-bold text-white hover:bg-slate-700 transition"
-            >
+            <button type="button" onClick={clearFilters} className="rounded-xl bg-slate-800 px-4 py-2 text-sm font-bold text-white hover:bg-slate-700 transition">
               清除篩選
             </button>
 
-            <button
-              type="button"
-              onClick={exportTodayCsv}
-              className="rounded-xl bg-slate-800 px-4 py-2 text-sm font-bold text-white hover:bg-slate-700 transition"
-            >
+            <button type="button" onClick={exportTodayCsv} className="rounded-xl bg-slate-800 px-4 py-2 text-sm font-bold text-white hover:bg-slate-700 transition">
               匯出目前結果 CSV
             </button>
           </div>
@@ -413,83 +361,62 @@ export default function TodayTable({ todayPlayers }: TodayTableProps) {
 
       <div className="bg-slate-900 rounded-2xl border border-slate-700 overflow-hidden shadow-xl shadow-black/30">
         <div className="p-5 border-b border-slate-800">
-          <h2 className="text-xl font-bold">今日戰報</h2>
+          <h2 className="text-3xl font-bold">球員出賽紀錄</h2>
           <p className="text-slate-400 text-sm mt-1">
-            目前顯示：{filteredTodayPlayers.length} / {todayPlayers.length}
+            出賽球員：{filteredTodayPlayers.length} 人
           </p>
         </div>
 
-        <div className="max-h-[calc(100vh-260px)] overflow-auto overscroll-contain">
+        <div className="max-h-[calc(100vh-260px)] overflow-auto overscroll-contain touch-pan-x">
           <table className="w-full min-w-[1150px] border-separate border-spacing-0 text-sm whitespace-nowrap">
             <thead className="sticky top-0 z-50 bg-slate-800 text-slate-300">
               <tr>
-                <th className="sticky left-0 top-0 z-[70] bg-slate-800 text-left p-3 shadow-[4px_0_8px_rgba(0,0,0,0.35)] border-r border-slate-700">
+                <th className="sticky left-0 top-0 z-[70] bg-slate-800 text-right p-3 shadow-[4px_0_8px_rgba(0,0,0,0.35)] border-r border-slate-700">
                   球員
                 </th>
                 <th className="bg-slate-800 text-left p-3">日期</th>
-                <th className="bg-slate-800 text-left p-3">類型</th>
+                <th className="bg-slate-800 text-left p-3">守位</th>
                 <th className="bg-slate-800 text-left p-3">聯盟</th>
-                <th className="bg-slate-800 text-left p-3">球隊</th>
+                <th className="bg-slate-800 text-right p-3">球隊</th>
                 <th className="bg-slate-800 text-left p-3">層級</th>
                 <th className="bg-slate-800 text-left p-3">結果</th>
-                <th className="bg-slate-800 text-left p-3">對手</th>
-                <th className="bg-slate-800 text-left p-3">成績</th>
+                <th className="bg-slate-800 text-right p-3">對手</th>
+                <th className="bg-slate-800 text-right p-3">成績</th>
               </tr>
             </thead>
 
             <tbody>
               {filteredTodayPlayers.length === 0 ? (
                 <tr>
-                  <td
-                    colSpan={9}
-                    className="p-8 text-center text-slate-400 border-t border-slate-800"
-                  >
-                    找不到符合條件的今日戰報
+                  <td colSpan={9} className="p-8 text-center text-slate-400 border-t border-slate-800">
+                    找不到符合條件的出賽紀錄
                   </td>
                 </tr>
               ) : (
                 filteredTodayPlayers.map((report, index) => {
-                  const name = normalizeText(report.name) || "-";
+                  const name = getPlayerName(report) || "-";
+                  const playerId = getPlayerId(report);
+                  const safeId = playerId && playerId !== "undefined" ? playerId : null;
 
                   return (
-                    <tr
-                      key={`${name}-${index}`}
-                      className="border-t border-slate-800 hover:bg-slate-800/60"
-                    >
-                      <td className="sticky left-0 z-30 bg-slate-900 p-3 font-bold shadow-[4px_0_8px_rgba(0,0,0,0.35)] border-r border-slate-800">
+                    <tr key={`${report.id || name}-${index}`} className="border-t border-slate-800 hover:bg-slate-800/60">
+                      <td className="sticky left-0 z-30 bg-slate-900 p-3 text-right font-bold shadow-[4px_0_8px_rgba(0,0,0,0.35)] border-r border-slate-800">
                         <Link
-                          href={`/players/${encodeURIComponent(
-                            report.id || name
-                          )}`}
+                          href={safeId ? `/players/${encodeURIComponent(safeId)}` : "#"}
                           className="text-sky-300 hover:text-sky-200 hover:underline"
                         >
                           {name}
                         </Link>
                       </td>
-                      <td className="p-3">
-                        {normalizeText(report.date) || "-"}
-                      </td>
-                      <td className="p-3">
-                        {normalizeText(report.type) || "-"}
-                      </td>
-                      <td className="p-3">
-                        {normalizeText(report.league) || "-"}
-                      </td>
-                      <td className="p-3">
-                        {normalizeText(report.team) || "-"}
-                      </td>
-                      <td className="p-3">
-                        {normalizeText(report.level) || "-"}
-                      </td>
-                      <td className="p-3">
-                        {normalizeText(report.result) || "-"}
-                      </td>
-                      <td className="p-3">
-                        {normalizeText(report.opponent) || "-"}
-                      </td>
-                      <td className="p-3 whitespace-normal min-w-[360px]">
-                        {normalizeText(report.stats) || "-"}
-                      </td>
+
+                      <td className="p-3 text-left">{formatDate(report.report_date)}</td>
+                      <td className="p-3 text-left">{normalizeText(report.position) || "-"}</td>
+                      <td className="p-3 text-left">{getPlayerLeague(report) || "-"}</td>
+                      <td className="p-3 text-right">{getPlayerTeam(report) || "-"}</td>
+                      <td className="p-3 text-left">{getPlayerLevel(report) || "-"}</td>
+                      <td className="p-3 text-left">{normalizeText(report.result) || "-"}</td>
+                      <td className="p-3 text-right">{normalizeText(report.opponent) || "-"}</td>
+                      <td className="p-3 text-right whitespace-normal min-w-[260px]">{getStats(report) || "-"}</td>
                     </tr>
                   );
                 })

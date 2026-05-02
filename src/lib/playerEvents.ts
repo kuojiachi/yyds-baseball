@@ -1,24 +1,30 @@
-import { supabase } from './supabase'
+import { supabase } from "./supabase";
 
 export async function getPlayerEvents() {
   const { data, error } = await supabase
-    .from('player_events')
+    .from("player_events")
     .select(`
       id,
+      name_zh,
       event_date,
       event_type,
+      from_team,
+      to_team,
+      from_level,
+      to_level,
+      league,
       note,
-      players (
-        name_zh
-      )
+      created_at
     `)
-    .order('event_date', { ascending: false })
-    .limit(10)
+    .not("event_type", "is", null)
+    .not("event_date", "is", null)
+    .order("event_date", { ascending: false })
+    .limit(20);
 
   if (error) {
-    console.error(error)
-    return []
+    console.error("getPlayerEvents error:", error.message);
+    return [];
   }
 
-  return data
+  return data || [];
 }

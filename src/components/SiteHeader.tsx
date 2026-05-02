@@ -7,7 +7,7 @@ import type { FormEvent, ReactNode } from "react";
 type SiteHeaderProps = {
   subtitle?: string;
   showSearch?: boolean;
-  playerNameOptions?: string[];
+  playerNameOptions?: any[];
   rightSlot?: ReactNode;
 };
 
@@ -38,7 +38,7 @@ function saveSearchCounts(counts: SearchCounts) {
   window.localStorage.setItem(SEARCH_COUNTS_KEY, JSON.stringify(counts));
 }
 
-function SearchBox({ playerNameOptions }: { playerNameOptions: string[] }) {
+function SearchBox({ playerNameOptions }: { playerNameOptions: any[] }) {
   const [keyword, setKeyword] = useState("");
   const [isFocused, setIsFocused] = useState(false);
   const [searchCounts, setSearchCounts] = useState<SearchCounts>({});
@@ -76,7 +76,9 @@ function SearchBox({ playerNameOptions }: { playerNameOptions: string[] }) {
     const text = keyword.trim().toLowerCase();
 
     const options = text
-      ? playerNameOptions.filter((name) => name.toLowerCase().includes(text))
+      ? playerNameOptions.filter((p) =>
+          String(p?.name_zh ?? "").toLowerCase().includes(text)
+        )
       : playerNameOptions;
 
     return options
@@ -88,7 +90,10 @@ function SearchBox({ playerNameOptions }: { playerNameOptions: string[] }) {
           return countB - countA;
         }
 
-        return a.localeCompare(b, "zh-Hant");
+        const aText = String(a?.name_zh ?? a ?? "");
+        const bText = String(b?.name_zh ?? b ?? "");
+
+        return aText.localeCompare(bText);
       })
       .slice(0, 8);
   }, [keyword, playerNameOptions, searchCounts]);
@@ -112,19 +117,19 @@ function SearchBox({ playerNameOptions }: { playerNameOptions: string[] }) {
           />
 
           {isFocused && matchedOptions.length > 0 ? (
-            <div className="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-xl border border-slate-700 bg-slate-900 shadow-xl shadow-black/40">
-              {matchedOptions.map((name) => (
+            <div className="absolute z-[9999] left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-xl border border-slate-700 bg-slate-900 shadow-xl shadow-black/40">
+              {matchedOptions.map((p) => (
                 <button
-                  key={name}
+                  key={p.name_zh}
                   type="button"
                   onMouseDown={(event) => {
                     event.preventDefault();
-                    recordSearch(name);
-                    window.location.href = `/search?q=${encodeURIComponent(name)}`;
+                    recordSearch(p.name_zh);
+                    window.location.href = `/search?q=${encodeURIComponent(p.name_zh)}`;
                   }}
                   className="block w-full px-3 py-2 text-left text-sm text-slate-200 hover:bg-slate-800"
                 >
-                  {name}
+                  {p.name_zh}
                 </button>
               ))}
             </div>
@@ -143,6 +148,22 @@ function SearchBox({ playerNameOptions }: { playerNameOptions: string[] }) {
 }
 
 function NavMenu() {
+  const [pathname, setPathname] = useState("/");
+
+  useEffect(() => {
+    setPathname(window.location.pathname);
+  }, []);
+
+  let ordered = NAV_ITEMS;
+
+  if (pathname.startsWith("/today")) {
+    ordered = [NAV_ITEMS[1], NAV_ITEMS[0], NAV_ITEMS[2]]; // 2 1 3
+  } else if (pathname.startsWith("/players")) {
+    ordered = [NAV_ITEMS[2], NAV_ITEMS[0], NAV_ITEMS[1]]; // 3 1 2
+  } else {
+    ordered = NAV_ITEMS; // 1 2 3
+  }
+
   return (
     <details className="relative">
       <summary className="list-none cursor-pointer rounded-lg border border-slate-700 bg-slate-900 px-3 py-1.5 text-lg font-bold text-white hover:bg-slate-800">
@@ -150,16 +171,15 @@ function NavMenu() {
       </summary>
 
       <div className="absolute left-0 z-50 mt-2 w-40 overflow-hidden rounded-xl border border-slate-700 bg-slate-900 shadow-xl shadow-black/40">
-        {NAV_ITEMS.map((item, index) => (
+        {ordered.map((item, index) => (
           <Link
             key={`${item.href}-${item.label}`}
             href={item.href}
             className={[
               "block px-4 py-3 hover:bg-slate-800",
-              item.isBrand
-                ? "border-b-2 border-slate-600 text-4xl font-bold text-white tracking-wide"
-                : "text-sm text-slate-200",
-              index > 1 ? "border-t border-slate-800" : "",
+              index === 0
+                ? "text-2xl font-bold text-white border-b border-slate-700"
+                : "text-sm text-slate-300",
             ].join(" ")}
           >
             {item.label}
@@ -176,7 +196,7 @@ export default function SiteHeader({
   rightSlot,
 }: SiteHeaderProps) {
   return (
-    <header className="mb-4">
+    <header className="relative z-[9999] mb-4">
       <div className="flex flex-col gap-3 border-b border-slate-800 pb-3 md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-4">
           <NavMenu />

@@ -1,14 +1,16 @@
 import { Suspense } from "react";
-
+import { getPlayerEvents } from "@/src/lib/playerEvents";
 import SiteHeader from "@/src/components/SiteHeader";
-import { getPlayersFromExcel } from "@/src/lib/excel";
+import { getPlayers } from "@/src/lib/players";
 import { getPlayerNameOptions } from "@/src/utils/playerNameOptions";
 
 import PlayersTable from "./PlayersTable";
 
 export default async function PlayersPage() {
-  const players = await getPlayersFromExcel();
-  const playerNameOptions = getPlayerNameOptions(players);
+  const players = await getPlayers();
+  const playerNameOptions = getPlayerNameOptions(players as any);
+
+  const events = await getPlayerEvents();
 
   return (
     <main className="min-h-screen bg-slate-950 text-white px-6 pt-3 pb-6">
@@ -16,7 +18,7 @@ export default async function PlayersPage() {
         <SiteHeader
           subtitle="台灣旅外球員追蹤系統"
           showSearch
-          playerNameOptions={playerNameOptions}
+          playerNameOptions={playerNameOptions as any}
         />
 
         <div className="mb-6">
@@ -30,7 +32,7 @@ export default async function PlayersPage() {
             </div>
           }
         >
-          <PlayersTable players={players} />
+          <PlayersTable players={players as any} events={events as any} />
         </Suspense>
       </section>
     </main>

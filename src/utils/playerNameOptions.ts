@@ -1,11 +1,14 @@
-import type { Player } from "@/src/lib/excel";
+type PlayerNameSource = {
+  id?: string | number | null;
+  name_zh?: string | null;
+  name_en?: string | null;
+  name?: string | null;
+};
 
-function normalizeText(value: unknown): string {
-  return String(value ?? "").trim();
-}
-
-export function getPlayerNameOptions(players: Player[]): string[] {
-  return Array.from(
-    new Set(players.map((player) => normalizeText(player.name)).filter(Boolean))
-  ).sort((a, b) => a.localeCompare(b, "zh-Hant"));
+export function getPlayerNameOptions(players: PlayerNameSource[]) {
+  return players.map((player) => ({
+    id: String(player.id ?? ""),
+    name_zh: String(player.name_zh ?? player.name ?? ""),
+    name_en: String(player.name_en ?? ""),
+  }));
 }

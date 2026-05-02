@@ -1,40 +1,36 @@
 import { Suspense } from "react";
 
 import SiteHeader from "@/src/components/SiteHeader";
-import {
-  getPlayersFromExcel,
-  getTodayReportsFromExcel,
-} from "@/src/lib/excel";
+import { getPlayers } from "@/src/lib/players";
+import { getDailyReports } from "@/src/lib/dailyReports";
 import { getPlayerNameOptions } from "@/src/utils/playerNameOptions";
 
 import TodayTable from "./TodayTable";
 
 export default async function TodayPage() {
-  const todayPlayers = await getTodayReportsFromExcel();
-  const players = await getPlayersFromExcel();
-  const playerNameOptions = getPlayerNameOptions(players);
+  const todayPlayers = (await getDailyReports()).filter(
+    (report: any) => String(report.result ?? "").trim() !== ""
+  );
+  const players = await getPlayers();
+  const playerNameOptions = getPlayerNameOptions(players as any);
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white px-6 pt-3 pb-6">
+    <main className="min-h-screen bg-slate-950 text-white px-6 pt-8 pb-6">
       <section className="max-w-7xl mx-auto">
         <SiteHeader
           subtitle="台灣旅外球員追蹤系統"
           showSearch
-          playerNameOptions={playerNameOptions}
+          playerNameOptions={playerNameOptions as any}
         />
-
-        <div className="mb-6">
-          <h2 className="text-3xl font-bold">今日出賽</h2>
-        </div>
 
         <Suspense
           fallback={
             <div className="rounded-2xl border border-slate-700 bg-slate-900 p-6 text-slate-300">
-              載入今日出賽資料中...
+              載入球員出賽紀錄中...
             </div>
           }
         >
-          <TodayTable todayPlayers={todayPlayers} />
+          <TodayTable todayPlayers={todayPlayers as any} />
         </Suspense>
       </section>
     </main>
