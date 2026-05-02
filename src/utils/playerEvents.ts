@@ -70,7 +70,7 @@ export function getEventDisplay(event: PlayerEvent) {
     };
   }
 
-  if (eventType === "signed") {
+  if (eventType === "signed" || eventType === "sign") {
     return {
       label: "簽約",
       type: "movement",
@@ -83,6 +83,16 @@ export function getEventDisplay(event: PlayerEvent) {
   if (eventType === "injury") {
     return {
       label: "傷兵",
+      type: "status",
+      team,
+      level,
+      colorClass: "text-yellow-400",
+    };
+  }
+
+  if (eventType === "rehab") {
+    return {
+      label: "復健賽",
       type: "status",
       team,
       level,

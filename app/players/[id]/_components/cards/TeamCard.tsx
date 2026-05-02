@@ -11,17 +11,30 @@ function displayValue(value: unknown) {
   return v || "-";
 }
 
+function getTeam(player: any) {
+  return Array.isArray(player.teams) ? player.teams[0] : player.teams;
+}
+
+function getTeamCode(player: any) {
+  const team = getTeam(player);
+  return displayValue(team?.code || team?.abbreviation);
+}
+
 function getTeamName(player: any) {
+  const team = getTeam(player);
+
   return displayValue(
-    player.teams?.abbreviation ||
-      player.teams?.name_zh ||
-      player.teams?.name_en ||
+    team?.name_zh ||
+      team?.name_en ||
       player.team_name ||
       player.team
   );
 }
 
 export default function TeamCard({ player }: TeamCardProps) {
+  const teamCode = getTeamCode(player);
+  const teamName = getTeamName(player);
+
   return (
     <a
       href={player.id ? `/players/${player.id}/events?kind=team` : "#"}
@@ -30,11 +43,11 @@ export default function TeamCard({ player }: TeamCardProps) {
       <div className="text-sm text-slate-400">球隊</div>
 
       <div className="mt-2 text-lg font-bold text-white">
-        {getTeamName(player)}
+        {teamCode}
       </div>
 
       <div className="mt-2 text-xs text-slate-500">
-        點擊查看球隊歷史
+        {teamName}
       </div>
     </a>
   );

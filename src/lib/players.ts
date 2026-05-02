@@ -1,8 +1,8 @@
-import { supabase } from "./supabase";
+import { supabase } from './supabase'
 
 export async function getPlayers() {
   const { data, error } = await supabase
-    .from("players")
+    .from('players')
     .select(`
       id,
       name_zh,
@@ -12,20 +12,20 @@ export async function getPlayers() {
       position,
       status,
       note,
-      team_name,
       current_team_id,
       teams:current_team_id (
         id,
+        code,
         name_zh,
-        name_en,
-        league
+        name_en
       )
     `)
-    .order("level", { ascending: true });
+    .order('name_zh', { ascending: true })
 
   if (error) {
-    console.error('getPlayers error:', error)
-    throw error
+    console.error('getPlayers error:', error.message)
+    return []
   }
-  return data || [];
+
+  return data ?? []
 }

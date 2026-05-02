@@ -34,6 +34,23 @@ function text(value: unknown): string {
   return String(value ?? "").trim();
 }
 
+function getTeam(row: any) {
+  const teams = row?.teams;
+  return Array.isArray(teams) ? teams[0] : teams;
+}
+
+function getTeamName(row: any) {
+  const team = getTeam(row);
+
+  return (
+    text(team?.name_zh) ||
+    text(team?.name_en) ||
+    text(team?.code) ||
+    text(row.team_name) ||
+    "-"
+  );
+}
+
 function normalizeLeague(league: unknown): string {
   const value = text(league);
 
@@ -46,6 +63,22 @@ function normalizeLeague(league: unknown): string {
 
 function levelRank(level: unknown) {
   return LEVEL_ORDER[text(level)] ?? 999;
+}
+
+function isWithinLastDays(dateValue: unknown, days: number) {
+  const value = text(dateValue);
+  if (!value) return false;
+
+  const eventDate = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(eventDate.getTime())) return false;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const startDate = new Date(today);
+  startDate.setDate(today.getDate() - days);
+
+  return eventDate >= startDate && eventDate <= today;
 }
 
 function toggleValue(values: string[], value: string) {
@@ -124,7 +157,7 @@ export default function PlayersTable({ players, events }: PlayersTableProps) {
       .filter((player: any) => {
         const name = text(player.name_zh).toLowerCase();
         const nameEn = text(player.name_en).toLowerCase();
-        const team = text(player.teams?.name_zh || player.team_name).toLowerCase();
+        const team = getTeamName(player).toLowerCase();
         const league = normalizeLeague(player.league);
         const level = text(player.level);
         const position = text(player.position);
@@ -257,7 +290,10 @@ export default function PlayersTable({ players, events }: PlayersTableProps) {
                 const eventDisplay = event ? getEventDisplay(event) : null;
 
                 const movement =
-                  eventDisplay?.type === "movement" ? eventDisplay.label : "-";
+                  eventDisplay?.type === "movement" &&
+                  isWithinLastDays(event?.event_date, 7)
+                    ? eventDisplay.label
+                    : "-";
 
                 const rawStatus =
                   eventDisplay?.type === "status"
@@ -283,7 +319,7 @@ export default function PlayersTable({ players, events }: PlayersTableProps) {
                     <td className="p-3">{player.position || "-"}</td>
                     <td className="p-3">{normalizeLeague(player.league)}</td>
                     <td className="p-3">
-                      {player.teams?.name_zh || player.team_name || "-"}
+                      {getTeamName(player)}
                     </td>
                     <td className="p-3">{player.level || "-"}</td>
                     <td className="p-3 text-green-400">{movement}</td>

@@ -53,7 +53,12 @@ function isTargetEvent(event: any, kind: string) {
   }
 
   if (kind === "level") {
-    return eventType === "promotion" || eventType === "demotion";
+    return (
+      eventType === "promotion" ||
+      eventType === "option" ||
+      eventType === "recall" ||
+      eventType === "assign"
+    );
   }
 
   if (kind === "team") {
@@ -93,10 +98,13 @@ function getEventContent(event: any, kind: string) {
   }
 
   if (kind === "level") {
-    if (eventType === "promotion") return `升上 ${displayValue(event.to_level)}`;
-    if (eventType === "demotion") return `降到 ${displayValue(event.to_level)}`;
-    return displayValue(event.to_level || event.note || event.event_type);
-  }
+  if (eventType === "promotion") return `升上 ${displayValue(event.to_level)}`;
+  if (eventType === "recall") return `召回 ${displayValue(event.to_level)}`;
+  if (eventType === "option") return `下放 ${displayValue(event.to_level)}`;
+  if (eventType === "assign") return `指派 ${displayValue(event.to_level)}`;
+
+  return displayValue(event.to_level || event.note || event.event_type);
+}
 
   if (kind === "team") {
     return displayValue(

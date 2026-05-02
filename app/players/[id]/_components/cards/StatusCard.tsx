@@ -13,10 +13,10 @@ function displayValue(value: unknown) {
 }
 
 function getStatusClass(status: string) {
-  if (status === "現役") return "text-green-400";
-  if (status === "傷兵") return "text-yellow-400";
+  if (status === "現役" || status === "active") return "text-green-400";
+  if (status === "傷兵" || status === "IL60" || status === "IL10" || status === "IL15" || status === "IL7") return "text-yellow-400";
   if (status === "DFA") return "text-orange-400";
-  if (status === "釋出") return "text-red-400";
+  if (status === "自由球員" || status === "釋出") return "text-red-400";
   return "text-slate-300";
 }
 
@@ -24,11 +24,10 @@ function getLatestStatusEvent(playerEvents: any[]) {
   return playerEvents.find((event) => {
     const eventType = text(event.event_type).toLowerCase();
     return (
-      eventType === "injured" ||
-      eventType === "activated" ||
+      eventType === "injury" ||
+      eventType === "active" ||
       eventType === "dfa" ||
-      eventType === "released" ||
-      eventType === "status"
+      eventType === "free_agent"
     );
   });
 }
@@ -36,20 +35,28 @@ function getLatestStatusEvent(playerEvents: any[]) {
 function getStatusFromEvent(event: any) {
   const eventType = text(event?.event_type).toLowerCase();
 
-  if (eventType === "injured") return "傷兵";
-  if (eventType === "activated") return "現役";
+  if (eventType === "injury") return "傷兵";
+  if (eventType === "active") return "現役";
   if (eventType === "dfa") return "DFA";
-  if (eventType === "released") return "釋出";
+  if (eventType === "free_agent") return "自由球員";
 
-  return text(event?.status_value) || text(event?.note);
+  return "";
 }
 
 export default function StatusCard({ player, playerEvents }: StatusCardProps) {
   const latestStatusEvent = getLatestStatusEvent(playerEvents);
 
-  const status =
+  const rawStatus =
     getStatusFromEvent(latestStatusEvent) ||
     displayValue(player.status || "現役");
+
+  const status =
+    rawStatus === "IL60" ||
+    rawStatus === "IL10" ||
+    rawStatus === "IL15" ||
+    rawStatus === "IL7"
+      ? "傷兵"
+      : rawStatus;
 
   const subText = latestStatusEvent
     ? displayValue(latestStatusEvent.event_date)

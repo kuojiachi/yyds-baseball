@@ -21,7 +21,12 @@ function getMovementClass(movement: string) {
 function getLatestLevelEvent(playerEvents: any[]) {
   return playerEvents.find((event) => {
     const eventType = text(event.event_type).toLowerCase();
-    return eventType === "promotion" || eventType === "demotion";
+    return (
+      eventType === "promotion" ||
+      eventType === "option" ||
+      eventType === "recall" ||
+      eventType === "assign"
+    );
   });
 }
 
@@ -30,7 +35,9 @@ function getMovementText(event: any) {
   const toLevel = displayValue(event?.to_level);
 
   if (eventType === "promotion") return `↑ 升${toLevel}`;
-  if (eventType === "demotion") return `↓ 降${toLevel}`;
+  if (eventType === "recall") return `↑ 召回${toLevel}`;
+  if (eventType === "option") return `↓ 下放${toLevel}`;
+  if (eventType === "assign") return `指派${toLevel}`;
 
   return "近一周無升降";
 }
@@ -39,6 +46,7 @@ export default function LevelCard({ player, playerEvents }: LevelCardProps) {
   const latestLevelEvent = getLatestLevelEvent(playerEvents);
 
   const level = displayValue(player.level);
+
   const movement = latestLevelEvent
     ? getMovementText(latestLevelEvent)
     : "近一周無升降";
