@@ -50,6 +50,8 @@ function toNumberOrNull(value: string) {
 }
 
 export default function NewDailyReportPage() {
+  const [search, setSearch] = useState("");
+
   const [players, setPlayers] = useState<Player[]>([]);
   const [form, setForm] = useState(emptyForm);
   const [message, setMessage] = useState("");
@@ -72,6 +74,12 @@ export default function NewDailyReportPage() {
 
     loadPlayers();
   }, []);
+
+  const filteredPlayers = players.filter((p) =>
+    `${p.name_zh}${p.name_en ?? ""}`
+      .toLowerCase()
+      .includes(search.toLowerCase())
+  );
 
   function updateField(name: string, value: string) {
     setForm((prev) => ({
@@ -166,19 +174,29 @@ export default function NewDailyReportPage() {
             </div>
 
             <div>
-              <label className="text-sm text-slate-400">球員</label>
-              <select
-                value={form.player_id}
-                onChange={(e) => updateField("player_id", e.target.value)}
+              <label className="text-sm text-slate-400">搜尋球員</label>
+            
+              <input
+                placeholder="輸入姓名..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
                 className="mt-2 w-full rounded-xl bg-slate-800 border border-slate-700 p-3"
-              >
-                <option value="">選擇球員</option>
-                {players.map((player) => (
-                  <option key={player.id} value={player.id}>
-                    {player.name_zh} {player.name_en ? `｜${player.name_en}` : ""}
-                  </option>
+              />
+            
+              <div className="mt-2 max-h-40 overflow-y-auto border border-slate-700 rounded-xl">
+                {filteredPlayers.map((player) => (
+                  <div
+                    key={player.id}
+                    onClick={() => updateField("player_id", player.id)}
+                    className={`p-3 cursor-pointer hover:bg-slate-700 ${
+                      form.player_id === player.id ? "bg-blue-600" : ""
+                    }`}
+                  >
+                    {player.name_zh}
+                    {player.name_en ? ` ｜ ${player.name_en}` : ""}
+                  </div>
                 ))}
-              </select>
+              </div>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
