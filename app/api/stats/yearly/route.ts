@@ -30,7 +30,6 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
-  // 🔥 開始統計
   const stats = {
     games: data.length,
 
@@ -39,16 +38,17 @@ export async function GET(req: Request) {
     h: 0,
     rbi: 0,
     bb: 0,
-    so: 0,
+    k: 0,
     hr: 0,
     doubles: 0,
     triples: 0,
     sb: 0,
+    hbp: 0,
+    sf: 0,
 
     ip_outs: 0,
     er: 0,
-    bb_allowed: 0,
-    k: 0,
+    bf: 0,
     pitch_count: 0,
   };
 
@@ -58,29 +58,47 @@ export async function GET(req: Request) {
     stats.h += row.h || 0;
     stats.rbi += row.rbi || 0;
     stats.bb += row.bb || 0;
-    stats.so += row.so || 0;
+    stats.k += row.k || 0;
     stats.hr += row.hr || 0;
     stats.doubles += row.doubles || 0;
     stats.triples += row.triples || 0;
     stats.sb += row.sb || 0;
-
-    // ⚾ IP 轉 outs（0.1=1 out）
-    if (row.ip) {
-      const whole = Math.floor(row.ip);
-      const decimal = row.ip - whole;
-
-      const outs =
-        whole * 3 +
-        (decimal === 0.1 ? 1 : decimal === 0.2 ? 2 : 0);
-
-      stats.ip_outs += outs;
-    }
+    stats.hbp += row.hbp || 0;
+    stats.sf += row.sf || 0;
 
     stats.er += row.er || 0;
-    stats.bb_allowed += row.bb_allowed || 0;
-    stats.k += row.k || 0;
+    stats.bf += row.bf || 0;
     stats.pitch_count += row.pitch_count || 0;
+
+    if (row.ip) {
+      stats.ip_outs += ipToOuts(row.ip);
+    }
   }
 
-  return NextResponse.json(stats);
+  return NextResponse.json({
+    ...stats,
+    ip: outsToIp(stats.ip_outs),
+  });
+}
+
+function ipToOuts(ipValue: unknown): number {
+  const text = String(ipValue ?? "").trim();
+
+  if (!text) return 0;
+
+  const [wholeText, decimalText = "0"] = text.split(".");
+  const whole = Number(wholeText);
+  const decimal = Number(decimalText);
+
+  if (!Number.isFinite(whole)) return 0;
+
+  return whole * 3 + (decimal === 1 ? 1 : decimal === 2 ? 2 : 0);
+}
+
+function outsToIp(outs: number): string {
+  const innings = Math.floor(outs / 3);
+  const remainder = outs % 3;
+
+  if (remainder === 0) return `${innings}.0`;
+  return `${innings}.${remainder}`;
 }

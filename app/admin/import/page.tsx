@@ -58,11 +58,7 @@ export default function ImportCsvPage() {
         row["姓名"] ||
         null,
 
-      team:
-        row.team ||
-        row.team_name ||
-        row["球隊"] ||
-        null,
+      team: row.team || row.team_name || row["球隊"] || null,
 
       league: row.league || row["聯盟"] || null,
       level: row.level || row["層級"] || null,
@@ -70,26 +66,30 @@ export default function ImportCsvPage() {
       result: row.result || row["結果"] || null,
 
       ab: toNumber(row.ab || row["打數"]),
+      pa: toNumber(row.pa || row["PA"] || row["打席"]),
       r: toNumber(row.r || row["得分"]),
       h: toNumber(row.h || row["安打"]),
       rbi: toNumber(row.rbi || row["打點"]),
-      bb: toNumber(row.bb || row["四壞"]),
-      so: toNumber(row.so || row["三振"]),
+      bb: toNumber(row.bb || row["四壞"] || row["保送"]),
+      k: toNumber(row.k || row["K"] || row["三振"] || row["奪三振"]),
       hr: toNumber(row.hr || row["全壘打"]),
       doubles: toNumber(row.doubles || row["二壘打"]),
       triples: toNumber(row.triples || row["三壘打"]),
       sb: toNumber(row.sb || row["盜壘"]),
+      hbp: toNumber(row.hbp || row["HBP"] || row["觸身球"]),
+      sf: toNumber(row.sf || row["SF"] || row["高飛犧牲打"]),
 
       ip: row.ip || row["局數"] || null,
       er: toNumber(row.er || row["責失"]),
-      bb_allowed: toNumber(row.bb_allowed || row["保送"]),
-      k: toNumber(row.k || row["奪三振"]),
+      bf: toNumber(row.bf || row["BF"] || row["面對打席"]),
       pitch_count: toNumber(row.pitch_count || row["用球數"]),
 
       raw_data: row,
     }));
 
-    const { error } = await supabase.from("daily_reports_import").insert(payload);
+    const { error } = await supabase
+      .from("daily_reports_import")
+      .insert(payload);
 
     if (error) {
       setMessage(`上傳失敗：${error.message}`);
@@ -120,6 +120,12 @@ export default function ImportCsvPage() {
             }}
           />
 
+          {fileName ? (
+            <p className="mt-3 text-sm text-slate-400">
+              已選擇：{fileName}｜共 {rows.length} 筆
+            </p>
+          ) : null}
+
           <button
             onClick={uploadToSupabase}
             disabled={loading || rows.length === 0}
@@ -140,32 +146,3 @@ function toNumber(value: unknown) {
   const num = Number(value);
   return Number.isNaN(num) ? null : num;
 }
-
-const card: React.CSSProperties = {
-  border: "1px solid #ddd",
-  borderRadius: 12,
-  padding: 16,
-  marginTop: 16,
-  background: "#fff",
-};
-
-const button: React.CSSProperties = {
-  display: "block",
-  marginTop: 16,
-  padding: "8px 12px",
-  borderRadius: 8,
-  border: "1px solid #222",
-  cursor: "pointer",
-};
-
-const table: React.CSSProperties = {
-  borderCollapse: "collapse",
-  width: "100%",
-  fontSize: 14,
-};
-
-const cell: React.CSSProperties = {
-  border: "1px solid #ddd",
-  padding: 8,
-  whiteSpace: "nowrap",
-};

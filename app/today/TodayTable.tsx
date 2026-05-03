@@ -93,14 +93,131 @@ function formatDate(date: unknown): string {
   return text.slice(0, 10);
 }
 
-function getStats(report: TodayReport): string {
-  const stats = normalizeText(report.stats);
-
-  if (!stats || stats === "-") return "-";
-
-  return stats;
+function toNumber(value: unknown): number {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
 }
 
+function safeDivide(top: number, bottom: number): number | null {
+  if (!bottom) return null;
+  return top / bottom;
+}
+
+function formatRate(value: number | null): string {
+  if (value === null || !Number.isFinite(value)) return "-";
+  return value.toFixed(3).replace(/^0/, "");
+}
+
+function formatDecimal(value: number | null): string {
+  if (value === null || !Number.isFinite(value)) return "-";
+  return value.toFixed(2);
+}
+
+function ipToOuts(ipValue: unknown): number {
+  const text = String(ipValue ?? "").trim();
+  if (!text) return 0;
+
+  const [wholeText, decimalText = "0"] = text.split(".");
+  const whole = Number(wholeText);
+  const decimal = Number(decimalText);
+
+  if (!Number.isFinite(whole)) return 0;
+
+  return whole * 3 + (decimal === 1 ? 1 : decimal === 2 ? 2 : 0);
+}
+
+function hasValue(value: unknown): boolean {
+  return value !== null && value !== undefined && String(value).trim() !== "";
+}
+
+function hasBattingStats(report: TodayReport): boolean {
+  return [
+    report.ab,
+    report.pa,
+    report.r,
+    report.h,
+    report.rbi,
+    report.bb,
+    report.k,
+    report.hr,
+    report.doubles,
+    report.triples,
+    report.sb,
+    report.hbp,
+    report.sf,
+  ].some(hasValue);
+}
+
+function hasPitchingStats(report: TodayReport): boolean {
+  return [
+    report.ip,
+    report.er,
+    report.bf,
+    report.pitch_count,
+  ].some(hasValue);
+}
+
+function getStats(report: TodayReport): string {
+  if (hasPitchingStats(report)) {
+    const ipOuts = ipToOuts(report.ip);
+    const ip = ipOuts / 3;
+
+    const h = toNumber(report.h);
+    const hr = toNumber(report.hr);
+    const k = toNumber(report.k);
+    const bb = toNumber(report.bb);
+    const er = toNumber(report.er);
+
+    const era = safeDivide(er * 9, ip);
+    const whip = safeDivide(h + bb, ip);
+
+    return [
+      `IP ${report.ip ?? 0}`,
+      `投球數 ${report.pitch_count ?? 0}`,
+      `H ${h}`,
+      `HR ${hr}`,
+      `K ${k}`,
+      `BB ${bb}`,
+      `ERA ${formatDecimal(era)}`,
+      `WHIP ${formatDecimal(whip)}`,
+    ].join(" / ");
+  }
+
+  if (hasBattingStats(report)) {
+    const ab = toNumber(report.ab);
+    const pa = toNumber(report.pa);
+    const h = toNumber(report.h);
+    const hr = toNumber(report.hr);
+    const k = toNumber(report.k);
+    const bb = toNumber(report.bb);
+    const doubles = toNumber(report.doubles);
+    const triples = toNumber(report.triples);
+
+    const singles = h - doubles - triples - hr;
+    const tb = singles + doubles * 2 + triples * 3 + hr * 4;
+
+    const avg = safeDivide(h, ab);
+    const obp = safeDivide(
+      h + bb + toNumber(report.hbp),
+      pa
+    );
+    const slg = safeDivide(tb, ab);
+    const ops = obp === null && slg === null ? null : (obp ?? 0) + (slg ?? 0);
+
+    return [
+      `AB ${ab}`,
+      `PA ${pa}`,
+      `H ${h}`,
+      `HR ${hr}`,
+      `K ${k}`,
+      `BB ${bb}`,
+      `AVG ${formatRate(avg)}`,
+      `OPS ${formatRate(ops)}`,
+    ].join(" / ");
+  }
+
+  return "-";
+}
 function isPitcher(report: TodayReport): boolean {
   const type = normalizeText(report.position).toLowerCase();
   return type.includes("投") || type.includes("pitcher") || type === "p";

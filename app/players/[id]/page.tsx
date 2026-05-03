@@ -126,25 +126,27 @@ function hasRealGameReport(report: any): boolean {
 function getHitterReportTotals(reports: any[]) {
   return reports.reduce(
     (totals, report) => {
-      const parsed = parseHitterStatsText(report.stats);
-
       totals.games += 1;
-      totals.ab += addNumber(report.at_bats, report.atBats, report.ab, parsed.ab);
-      totals.h += addNumber(report.hits, report.h, parsed.h);
-      totals.doubles += addNumber(report.doubles, report["2b"]);
-      totals.triples += addNumber(report.triples, report["3b"]);
-      totals.hr += addNumber(report.home_runs, report.homeRuns, report.hr);
-      totals.rbi += addNumber(report.rbi, parsed.rbi);
-      totals.runs += addNumber(report.runs, report.r);
-      totals.bb += addNumber(report.walks, report.bb);
-      totals.so += addNumber(report.strikeouts, report.so);
-      totals.sb += addNumber(report.stolen_bases, report.stolenBases, report.sb);
+      totals.ab += toNumber(report.ab);
+      totals.pa += toNumber(report.pa);
+      totals.h += toNumber(report.h);
+      totals.doubles += toNumber(report.doubles);
+      totals.triples += toNumber(report.triples);
+      totals.hr += toNumber(report.hr);
+      totals.rbi += toNumber(report.rbi);
+      totals.runs += toNumber(report.r);
+      totals.bb += toNumber(report.bb);
+      totals.k += toNumber(report.k);
+      totals.sb += toNumber(report.sb);
+      totals.hbp += toNumber(report.hbp);
+      totals.sf += toNumber(report.sf);
 
       return totals;
     },
     {
       games: 0,
       ab: 0,
+      pa: 0,
       h: 0,
       doubles: 0,
       triples: 0,
@@ -152,8 +154,10 @@ function getHitterReportTotals(reports: any[]) {
       rbi: 0,
       runs: 0,
       bb: 0,
-      so: 0,
+      k: 0,
       sb: 0,
+      hbp: 0,
+      sf: 0,
     }
   );
 }
@@ -162,119 +166,116 @@ function getPitcherReportTotals(reports: any[]) {
   return reports.reduce(
     (totals, report) => {
       totals.games += 1;
-      totals.starts += toNumber(report.starts ?? report.gs ?? report.is_starting);
-      totals.wins += toNumber(report.wins ?? report.w);
-      totals.losses += toNumber(report.losses ?? report.l);
-      totals.ipOuts += ipToOuts(report.innings ?? report.ip);
-      totals.pitches += toNumber(report.pitches);
-      totals.runsAllowed += toNumber(report.runs_allowed ?? report.runsAllowed);
-      totals.earnedRuns += toNumber(report.earned_runs ?? report.earnedRuns ?? report.er);
-      totals.hitsAllowed += toNumber(report.hits_allowed ?? report.hitsAllowed ?? report.h);
-      totals.homeRunsAllowed += toNumber(report.home_runs_allowed ?? report.homeRunsAllowed ?? report.hr);
-      totals.walksAllowed += toNumber(report.walks_allowed ?? report.walksAllowed ?? report.bb);
-      totals.strikeouts += toNumber(report.strikeouts_pitching ?? report.strikeoutsPitching ?? report.so);
+      totals.ipOuts += ipToOuts(report.ip);
+      totals.er += toNumber(report.er);
+      totals.h += toNumber(report.h);
+      totals.bb += toNumber(report.bb);
+      totals.k += toNumber(report.k);
+      totals.bf += toNumber(report.bf);
 
       return totals;
     },
     {
       games: 0,
-      starts: 0,
-      wins: 0,
-      losses: 0,
       ipOuts: 0,
-      pitches: 0,
-      runsAllowed: 0,
-      earnedRuns: 0,
-      hitsAllowed: 0,
-      homeRunsAllowed: 0,
-      walksAllowed: 0,
-      strikeouts: 0,
+      er: 0,
+      h: 0,
+      bb: 0,
+      k: 0,
+      bf: 0,
     }
   );
 }
 
 function getHitterStats(player: any, reports: any[]): StatRow[] {
-  const reportTotals = getHitterReportTotals(reports);
+  const t = getHitterReportTotals(reports);
 
-  const games = addNumber(player.games ?? player.g, reportTotals.games);
-  const ab = addNumber(player.at_bats ?? player.atBats ?? player.ab, reportTotals.ab);
-  const h = addNumber(player.hits ?? player.h, reportTotals.h);
-  const doubles = addNumber(player.doubles ?? player["2b"], reportTotals.doubles);
-  const triples = addNumber(player.triples ?? player["3b"], reportTotals.triples);
-  const hr = addNumber(player.home_runs ?? player.homeRuns ?? player.hr, reportTotals.hr);
-  const rbi = addNumber(player.rbi, reportTotals.rbi);
-  const runs = addNumber(player.runs ?? player.r, reportTotals.runs);
-  const bb = addNumber(player.walks ?? player.bb, reportTotals.bb);
-  const so = addNumber(player.strikeouts ?? player.so, reportTotals.so);
-  const sb = addNumber(player.stolen_bases ?? player.stolenBases ?? player.sb, reportTotals.sb);
+  const ab = t.ab;
+  const h = t.h;
 
-  const totalBases = h + doubles + triples * 2 + hr * 3;
+  const singles = h - t.doubles - t.triples - t.hr;
+  const tb = singles + t.doubles * 2 + t.triples * 3 + t.hr * 4;
+
   const avg = safeDivide(h, ab);
-  const obp = safeDivide(h + bb, ab + bb);
-  const slg = safeDivide(totalBases, ab);
-  const ops = obp === null && slg === null ? null : (obp ?? 0) + (slg ?? 0);
+
+  const obp = safeDivide(
+    h + t.bb + t.hbp,
+    t.pa
+  );
+
+  const slg = safeDivide(tb, ab);
+  const ops = (obp ?? 0) + (slg ?? 0);
+
+  const iso = slg === null || avg === null ? null : slg - avg;
+
+  const babip = safeDivide(
+    h - t.hr,
+    ab - t.k - t.hr + t.sf
+  );
+  const kRate = safeDivide(t.k, t.pa);
+  const bbRate = safeDivide(t.bb, t.pa);
 
   return [
-    ["出賽", games],
+    ["出賽", t.games],
     ["打數", ab],
     ["安打", h],
-    ["二安", doubles],
-    ["三安", triples],
-    ["全壘打", hr],
-    ["打點", rbi],
-    ["得分", runs],
-    ["四壞", bb],
-    ["三振", so],
-    ["盜壘", sb],
+    ["二安", t.doubles],
+    ["三安", t.triples],
+    ["全壘打", t.hr],
+    ["打點", t.rbi],
+    ["得分", t.runs],
+    ["四壞", t.bb],
+    ["三振", t.k],
+    ["盜壘", t.sb],
+    ["HBP", t.hbp],
+    ["SF", t.sf],
     ["AVG", formatRate(avg)],
     ["OBP", formatRate(obp)],
     ["SLG", formatRate(slg)],
     ["OPS", formatRate(ops)],
+    ["ISO", formatRate(iso)],
+    ["BABIP", formatRate(babip)],
+    ["K%", formatRate(kRate)],
+    ["BB%", formatRate(bbRate)],
   ];
 }
 
 function getPitcherStats(player: any, reports: any[]): StatRow[] {
-  const reportTotals = getPitcherReportTotals(reports);
+  const t = getPitcherReportTotals(reports);
 
-  const games = addNumber(player.games ?? player.g, reportTotals.games);
-  const starts = addNumber(player.starts ?? player.gs, reportTotals.starts);
-  const wins = addNumber(player.wins ?? player.w, reportTotals.wins);
-  const losses = addNumber(player.losses ?? player.l, reportTotals.losses);
-  const ipOuts = ipToOuts(player.innings ?? player.ip) + reportTotals.ipOuts;
-  const ip = outsToIp(ipOuts);
-  const ipForRate = ipOuts / 3;
-  const pitches = addNumber(player.pitches, reportTotals.pitches);
-  const runsAllowed = addNumber(player.runs_allowed ?? player.runsAllowed, reportTotals.runsAllowed);
-  const earnedRuns = addNumber(player.earned_runs ?? player.earnedRuns, reportTotals.earnedRuns);
-  const hitsAllowed = addNumber(player.hits_allowed ?? player.hitsAllowed, reportTotals.hitsAllowed);
-  const homeRunsAllowed = addNumber(player.home_runs_allowed ?? player.homeRunsAllowed, reportTotals.homeRunsAllowed);
-  const walksAllowed = addNumber(player.walks_allowed ?? player.walksAllowed, reportTotals.walksAllowed);
-  const strikeouts = addNumber(player.strikeouts_pitching ?? player.strikeoutsPitching, reportTotals.strikeouts);
+  const ip = outsToIp(t.ipOuts);
+  const ipVal = t.ipOuts / 3;
 
-  const era = safeDivide(earnedRuns * 9, ipForRate);
-  const whip = safeDivide(hitsAllowed + walksAllowed, ipForRate);
-  const k9 = safeDivide(strikeouts * 9, ipForRate);
-  const bb9 = safeDivide(walksAllowed * 9, ipForRate);
-  const hr9 = safeDivide(homeRunsAllowed * 9, ipForRate);
+  const era = safeDivide(t.er * 9, ipVal);
+  const whip = safeDivide(t.bb + t.h, ipVal);
+
+  const k9 = safeDivide(t.k * 9, ipVal);
+  const bb9 = safeDivide(t.bb * 9, ipVal);
+  const kbb = safeDivide(t.k, t.bb);
+
+  const kRate = safeDivide(t.k, t.bf);
+  const bbRate = safeDivide(t.bb, t.bf);
+
+  const babip = safeDivide(
+    t.h - t.hr,
+    t.bf - t.k - t.bb - t.hbp - t.hr
+  );
 
   return [
-    ["出賽", games],
-    ["先發", starts],
-    ["勝", wins],
-    ["敗", losses],
+    ["出賽", t.games],
     ["局數", ip],
-    ["投球數", pitches],
-    ["失分", runsAllowed],
-    ["責失", earnedRuns],
-    ["被安打", hitsAllowed],
-    ["被全壘打", homeRunsAllowed],
-    ["四壞", walksAllowed],
-    ["三振", strikeouts],
+    ["責失", t.er],
+    ["被安打", t.h],
+    ["四壞", t.bb],
+    ["三振", t.k],
     ["ERA", formatDecimal(era)],
     ["WHIP", formatDecimal(whip)],
     ["K/9", formatDecimal(k9)],
     ["BB/9", formatDecimal(bb9)],
-    ["HR/9", formatDecimal(hr9)],
+    ["K/BB", formatDecimal(kbb)],
+    ["K%", formatRate(kRate)],
+    ["BB%", formatRate(bbRate)],
+    ["BABIP", formatRate(babip)],
   ];
 }
 

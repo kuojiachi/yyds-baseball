@@ -4,9 +4,6 @@ import { createClient } from "@supabase/supabase-js";
 export async function POST(req: Request) {
   const apiKey = req.headers.get("x-api-key");
 
-  console.log("前端傳來:", apiKey);
-  console.log("後端設定:", process.env.TWDS_API_KEY);
-
   if (!apiKey || apiKey !== process.env.TWDS_API_KEY) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -18,16 +15,43 @@ export async function POST(req: Request) {
 
   const body = await req.json();
 
+  const payload = {
+    player_id: body.player_id,
+    report_date: body.report_date,
+    league: body.league,
+    level: body.level,
+    position: body.position,
+    result: body.result,
+    game_type: body.game_type,
+    opponent: body.opponent,
+
+    ab: body.ab,
+    pa: body.pa,
+    r: body.r,
+    h: body.h,
+    rbi: body.rbi,
+    bb: body.bb,
+    k: body.k,
+    hr: body.hr,
+    doubles: body.doubles,
+    triples: body.triples,
+    sb: body.sb,
+    hbp: body.hbp,
+    sf: body.sf,
+
+    ip: body.ip,
+    er: body.er,
+    bf: body.bf,
+    pitch_count: body.pitch_count,
+  };
+
   const { data, error } = await supabase
     .from("daily_reports")
-    .insert(body)
+    .insert(payload)
     .select();
 
   if (error) {
-    return NextResponse.json(
-      { error: error.message },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
   return NextResponse.json({
