@@ -101,6 +101,7 @@ export default function NewDailyReportPage() {
 
       // 共用欄位
       ab: toNumberOrNull(form.ab),
+      pa: toNumberOrNull(form.pa),
       r: toNumberOrNull(form.r),
       h: toNumberOrNull(form.h),
       rbi: toNumberOrNull(form.rbi),
@@ -168,6 +169,7 @@ export default function NewDailyReportPage() {
             <h2 className="text-xl font-bold">打者成績</h2>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
               <Input label="AB" name="ab" value={form.ab} onChange={updateField} />
+              <Input label="PA" name="pa" value={form.pa} onChange={updateField} />
               <Input label="R" name="r" value={form.r} onChange={updateField} />
               <Input label="H" name="h" value={form.h} onChange={updateField} />
               <Input label="RBI" name="rbi" value={form.rbi} onChange={updateField} />
