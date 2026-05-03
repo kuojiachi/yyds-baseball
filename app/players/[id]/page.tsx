@@ -4,7 +4,6 @@ import { getDailyReports } from "@/src/lib/dailyReports";
 import { getPlayerEvents } from "@/src/lib/playerEvents";
 import { getPlayerNameOptions } from "@/src/utils/playerNameOptions";
 import PlayerPageHeader from "./_components/PlayerPageHeader";
-import PlayerInfoCards from "./_components/PlayerInfoCards";
 
 type PlayerPageProps = {
   params: Promise<Record<string, string>>;
@@ -376,9 +375,7 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
       <section className="w-full max-w-5xl mx-auto">
         <SiteHeader subtitle="球員個人頁" showSearch playerNameOptions={playerNameOptions as any} />
 
-        <PlayerPageHeader player={player} />
-
-        <PlayerInfoCards
+        <PlayerPageHeader
           player={player}
           playerEvents={playerEvents}
           playerReports={playerReports}

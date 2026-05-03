@@ -131,8 +131,7 @@ export default async function PlayerEventsPage({
   const query = await searchParams;
 
   const id = decodeURIComponent(routeParams.id || "");
-  const kind = query.kind || "status";
-  const title = kindTitleMap[kind] || "球員事件歷史";
+  const title = "球員歷史紀錄";
 
   const players = (await getPlayers()) as any[];
   const events = (await getPlayerEvents()) as any[];
@@ -170,7 +169,7 @@ export default async function PlayerEventsPage({
         text(event.name_zh) === text(player.name_zh) ||
         text(related?.name_zh) === text(player.name_zh);
 
-      return samePlayer && isTargetEvent(event, kind);
+      return samePlayer;
     })
     .sort((a: any, b: any) => {
       return new Date(b.event_date).getTime() - new Date(a.event_date).getTime();
@@ -208,7 +207,7 @@ export default async function PlayerEventsPage({
                   </div>
 
                   <div className="text-lg font-bold text-white">
-                    {getEventContent(event, kind)}
+                    {displayValue(event.note || event.to_team || event.to_level || event.status || event.event_type)}
                   </div>
                 </div>
               ))}
