@@ -160,33 +160,6 @@ export default function PlayerPageHeader({
             {displayValue(player.name_en)}
           </p>
         </div>
-
-        {/* 右：兩張卡（橫向） */}
-        {!showBackLink && (
-          <div className="grid grid-cols-2 gap-3 md:w-[520px]">
-
-            <a
-              href={player.id ? `/players/${player.id}/games` : "#"}
-              className="rounded-xl border border-slate-800 bg-slate-950/50 p-4 hover:bg-slate-800/60 transition"
-            >
-              <div className="text-sm text-slate-400">今年出賽</div>
-              <div className="mt-2 text-lg font-bold text-white">
-                今年 {playerReports.length} 場
-              </div>
-            </a>
-
-            <a
-              href={player.id ? `/players/${player.id}/events` : "#"}
-              className="rounded-xl border border-slate-800 bg-slate-950/50 p-4 hover:bg-slate-800/60 transition"
-            >
-              <div className="text-sm text-slate-400">球員狀態總覽</div>
-              <div className="mt-2 text-lg font-bold text-white">
-                {displayStatus(player.status)}｜{displayValue(player.level)}｜{getTeamName(player)}
-              </div>
-            </a>
-
-          </div>
-        )}
       </div>
 
       {/* 資料欄位 */}
@@ -204,7 +177,6 @@ export default function PlayerPageHeader({
           <InfoItem label="入隊方式" value={getJoinMethod(playerEvents)} />
         </div>
       )}
-
     </div>
   );
 }

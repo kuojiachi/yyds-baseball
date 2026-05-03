@@ -4,6 +4,7 @@ import { getDailyReports } from "@/src/lib/dailyReports";
 import { getPlayerEvents } from "@/src/lib/playerEvents";
 import { getPlayerNameOptions } from "@/src/utils/playerNameOptions";
 import PlayerPageHeader from "./_components/PlayerPageHeader";
+import PlayerStatsTabs from "./_components/PlayerStatsTabs";
 
 type PlayerPageProps = {
   params: Promise<Record<string, string>>;
@@ -380,22 +381,12 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
           playerEvents={playerEvents}
           playerReports={playerReports}
         />
-
-        <StatGrid title="年度數據" rows={annualStats} />
-
-        <div className="mt-6 rounded-2xl border border-slate-700 bg-slate-900 overflow-hidden">
-          <div className="p-5 border-b border-slate-800">
-            <h2 className="text-xl font-bold">歷史成績</h2>
-            <p className="text-slate-400 text-sm mt-1">
-              依年度、聯盟、球隊、層級分段；升降階會分開顯示
-            </p>
-          </div>
-
-          <div className="p-5 text-slate-400">
-            尚未建立歷史成績資料來源
-          </div>
-        </div>
-      </section>
+        <PlayerStatsTabs
+          player={player}
+          playerReports={playerReports}
+          playerEvents={playerEvents}
+        />
+        </section>
     </main>
   );
 }
