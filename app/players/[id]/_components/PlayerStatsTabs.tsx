@@ -22,6 +22,17 @@ function displayValue(value: unknown) {
   return v || "-";
 }
 
+function displayGameType(value: unknown) {
+  const type = text(value || "regular");
+
+  if (type === "regular") return "例行賽";
+  if (type === "postseason") return "季後賽";
+  if (type === "spring") return "春訓";
+  if (type === "exhibition") return "熱身賽";
+
+  return type || "-";
+}
+
 function getYear(date: unknown) {
   const v = text(date);
   return v ? v.slice(0, 4) : "-";
@@ -148,6 +159,10 @@ export default function PlayerStatsTabs({
     const map: Record<string, any> = {};
 
     for (const report of filteredReports) {
+      if (activeTab === "current") {
+        const type = report.game_type || "regular";
+        if (type !== "regular") continue;
+      }
       const year = getYear(report.report_date);
       const team = getTeam(report, player);
       const level = getLevel(report, player);
@@ -198,7 +213,19 @@ export default function PlayerStatsTabs({
     }
 
     return Object.values(map).sort((a: any, b: any) => {
-      return Number(b.year) - Number(a.year);
+      const yearDiff = Number(b.year) - Number(a.year);
+      if (yearDiff !== 0) return yearDiff;
+
+      const teamDiff = String(a.team).localeCompare(String(b.team));
+      if (teamDiff !== 0) return teamDiff;
+
+      const aLevelIndex = LEVEL_ORDER.indexOf(String(a.level));
+      const bLevelIndex = LEVEL_ORDER.indexOf(String(b.level));
+
+      const aRank = aLevelIndex === -1 ? 999 : aLevelIndex;
+      const bRank = bLevelIndex === -1 ? 999 : bLevelIndex;
+
+      return aRank - bRank;
     });
   }, [filteredReports, player]);
   
@@ -315,11 +342,81 @@ export default function PlayerStatsTabs({
 
         <div className="overflow-x-auto">
           {activeTab === "current" ? (
-            pitcher ? (
-              <PitcherTable rows={currentRows} total={currentTotal} />
-            ) : (
-              <HitterTable rows={currentRows} total={currentTotal} />
-            )
+            <>
+              {/* 例行賽 */}
+              {pitcher ? (
+                <PitcherTable rows={currentRows} total={currentTotal} />
+              ) : (
+                <HitterTable rows={currentRows} total={currentTotal} />
+              )}
+
+              {/* 季後賽（有才顯示） */}
+              {playerReports.some(
+                (r) =>
+                  (r.game_type === "postseason") &&
+                  String(r.report_date).startsWith(currentYear)
+              ) ? (
+                <div className="mt-6">
+                  <div className="text-lg font-bold mb-2">季後賽</div>
+
+                  {pitcher ? (
+                    <PitcherTable
+                      rows={historyRows.filter(
+                        (r: any) =>
+                          r.year === currentYear &&
+                          playerReports.some(
+                            (rep) =>
+                              rep.game_type === "postseason" &&
+                              rep.report_date.startsWith(currentYear) &&
+                              getTeam(rep, player) === r.team &&
+                              getLevel(rep, player) === r.level
+                          )
+                      )}
+                      total={getTotal(
+                        historyRows.filter(
+                          (r: any) =>
+                            r.year === currentYear &&
+                            playerReports.some(
+                              (rep) =>
+                                rep.game_type === "postseason" &&
+                                rep.report_date.startsWith(currentYear) &&
+                                getTeam(rep, player) === r.team &&
+                                getLevel(rep, player) === r.level
+                            )
+                        )
+                      )}
+                    />
+                  ) : (
+                    <HitterTable
+                      rows={historyRows.filter(
+                        (r: any) =>
+                          r.year === currentYear &&
+                          playerReports.some(
+                            (rep) =>
+                              rep.game_type === "postseason" &&
+                              rep.report_date.startsWith(currentYear) &&
+                              getTeam(rep, player) === r.team &&
+                              getLevel(rep, player) === r.level
+                          )
+                      )}
+                      total={getTotal(
+                        historyRows.filter(
+                          (r: any) =>
+                            r.year === currentYear &&
+                            playerReports.some(
+                              (rep) =>
+                                rep.game_type === "postseason" &&
+                                rep.report_date.startsWith(currentYear) &&
+                                getTeam(rep, player) === r.team &&
+                                getLevel(rep, player) === r.level
+                            )
+                        )
+                      )}
+                    />
+                  )}
+                </div>
+              ) : null}
+            </>
           ) : null}
 
           {activeTab === "history" ? (
@@ -495,12 +592,16 @@ function GameList({ reports }: { reports: any[] }) {
   return (
     <div className="divide-y divide-slate-800">
       {reports.map((report) => (
-        <div key={report.id || `${report.report_date}-${report.result}`} className="grid grid-cols-[120px_1fr] gap-4 p-4">
+        <div key={report.id || `${report.report_date}-${report.result}`} className="p-4 border-b border-slate-800">
           <div className="text-sm text-slate-400">
-            {displayValue(report.report_date)}
+            {displayValue(report.report_date)}　
+            {displayGameType(report.game_type)}｜
+            {displayValue(report.team_name || report.team)}｜
+            {displayValue(report.level)}｜
+            {displayValue(report.opponent || "對手")}
           </div>
 
-          <div className="font-bold text-white">
+          <div className="mt-1 font-bold text-white">
             {displayValue(report.result || report.stats || "出賽")}
           </div>
         </div>

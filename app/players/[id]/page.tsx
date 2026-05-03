@@ -282,6 +282,22 @@ function getAnnualStats(player: any, reports: any[]): StatRow[] {
   return isPitcher(player) ? getPitcherStats(player, reports) : getHitterStats(player, reports);
 }
 
+function groupReportsByLevel(reports: any[]) {
+  const groups: Record<string, any[]> = {};
+
+  for (const report of reports) {
+    const level = normalizeText(report.level) || "未標層級";
+
+    if (!groups[level]) {
+      groups[level] = [];
+    }
+
+    groups[level].push(report);
+  }
+
+  return groups;
+}
+
 function StatGrid({ title, rows }: { title: string; rows: StatRow[] }) {
   return (
     <div className="mt-6 rounded-2xl border border-slate-700 bg-slate-900 overflow-hidden">
@@ -353,6 +369,21 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
     return String(report.player_id) === String(player.id) && hasRealGameReport(report);
   });
 
+  const currentYear = new Date().getFullYear();
+
+  const currentYearReports = playerReports.filter((report: any) => {
+    const reportYear = new Date(report.report_date).getFullYear();
+    return reportYear === currentYear;
+  });
+
+const regularReports = currentYearReports.filter((report: any) => {
+  return (report.game_type || "regular") === "regular";
+});
+
+const postseasonReports = currentYearReports.filter((report: any) => {
+  return report.game_type === "postseason";
+});
+
   const playerEvents = events
     .filter((event: any) => {
       const related = getRelatedPlayer(event);
@@ -369,7 +400,9 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
 
   const playerRole = isPitcher(player) ? "投手" : "野手";
 
-  const annualStats = getAnnualStats(player, playerReports);
+  const annualStats = getAnnualStats(player, currentYearReports);
+
+  const reportsByLevel = groupReportsByLevel(currentYearReports);
 
   return (
     <main className="min-h-screen bg-slate-950 text-white px-6 pt-8 pb-6">

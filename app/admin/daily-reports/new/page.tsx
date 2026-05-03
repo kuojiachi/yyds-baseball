@@ -14,8 +14,12 @@ type Player = {
 const emptyForm = {
   player_id: "",
   report_date: "",
+  league: "",
+  level: "",
   position: "",
   result: "",
+  game_type: "regular",
+  opponent: "",
 
   ab: "",
   r: "",
@@ -45,6 +49,7 @@ export default function NewDailyReportPage() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [form, setForm] = useState(emptyForm);
   const [message, setMessage] = useState("");
+  const [password, setPassword] = useState("");
 
   useEffect(() => {
     async function loadPlayers() {
@@ -83,8 +88,12 @@ export default function NewDailyReportPage() {
     const payload = {
       player_id: form.player_id,
       report_date: form.report_date,
+      league: form.league || null,
+      level: form.level || null,
       position: form.position || null,
       result: form.result || null,
+      game_type: form.game_type || "regular",
+      opponent: form.opponent || null,
 
       ab: toNumberOrNull(form.ab),
       r: toNumberOrNull(form.r),
@@ -104,10 +113,19 @@ export default function NewDailyReportPage() {
       pitch_count: toNumberOrNull(form.pitch_count),
     };
 
-    const { error } = await supabase.from("daily_reports").insert(payload);
+    const res = await fetch("/api/daily-reports", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": password,
+      },
+      body: JSON.stringify(payload),
+    });
 
-    if (error) {
-      setMessage(`新增失敗：${error.message}`);
+    const result = await res.json();
+
+    if (!res.ok) {
+      setMessage(`新增失敗：${result.error || "未知錯誤"}`);
       return;
     }
 
@@ -130,6 +148,16 @@ export default function NewDailyReportPage() {
             className="mt-6 rounded-2xl border border-slate-700 bg-slate-900 p-6 space-y-6"
           >
             <div>
+              <label className="text-sm text-slate-400">管理員密碼</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="mt-2 w-full rounded-xl bg-slate-800 border border-slate-700 p-3"
+              />
+            </div>
+
+            <div>
               <label className="text-sm text-slate-400">球員</label>
               <select
                 value={form.player_id}
@@ -145,11 +173,59 @@ export default function NewDailyReportPage() {
               </select>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-7 gap-3">
               <Input label="日期" type="date" name="report_date" value={form.report_date} onChange={updateField} />
+              <label>
+                <div className="text-sm text-slate-400">當日聯盟</div>
+                <select
+                  value={form.league}
+                  onChange={(e) => updateField("league", e.target.value)}
+                  className="mt-2 w-full rounded-xl bg-slate-800 border border-slate-700 p-3"
+                >
+                  <option value="">選擇聯盟</option>
+                  <option value="MLB">MLB</option>
+                  <option value="NPB">NPB</option>
+                  <option value="KBO">KBO</option>
+                </select>
+              </label>
+
+              <label>
+                <div className="text-sm text-slate-400">當日層級</div>
+                <select
+                  value={form.level}
+                  onChange={(e) => updateField("level", e.target.value)}
+                  className="mt-2 w-full rounded-xl bg-slate-800 border border-slate-700 p-3"
+                >
+                  <option value="">選擇層級</option>
+                  <option value="MLB">MLB</option>
+                  <option value="3A">3A</option>
+                  <option value="2A">2A</option>
+                  <option value="A+">A+</option>
+                  <option value="A">A</option>
+                  <option value="Rk">Rk</option>
+                  <option value="一軍">一軍</option>
+                  <option value="二軍">二軍</option>
+                  <option value="三軍">三軍</option>
+                </select>
+              </label>
               <Input label="守位" name="position" value={form.position} onChange={updateField} />
               <Input label="結果" name="result" value={form.result} onChange={updateField} />
+              <Input label="對手" name="opponent" value={form.opponent} onChange={updateField} />
             </div>
+
+            <label>
+              <div className="text-sm text-slate-400">賽事類型</div>
+              <select
+                value={form.game_type}
+                onChange={(e) => updateField("game_type", e.target.value)}
+                className="mt-2 w-full rounded-xl bg-slate-800 border border-slate-700 p-3"
+              >
+                <option value="regular">例行賽</option>
+                <option value="postseason">季後賽</option>
+                <option value="spring">春訓</option>
+                <option value="exhibition">熱身賽</option>
+              </select>
+            </label>
 
             <h2 className="text-xl font-bold">打者成績</h2>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
