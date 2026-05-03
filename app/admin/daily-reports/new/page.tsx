@@ -165,6 +165,29 @@ export default function NewDailyReportPage() {
               />
             </div>
 
+            <div>
+              <label className="text-sm text-slate-400">球員</label>
+              <select
+                value={form.player_id}
+                onChange={(e) => updateField("player_id", e.target.value)}
+                className="mt-2 w-full rounded-xl bg-slate-800 border border-slate-700 p-3"
+              >
+                <option value="">選擇球員</option>
+                {players.map((player) => (
+                  <option key={player.id} value={player.id}>
+                    {player.name_zh} {player.name_en ? `｜${player.name_en}` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <Input label="日期" type="date" name="report_date" value={form.report_date} onChange={updateField} />
+              <Input label="守位" name="position" value={form.position} onChange={updateField} />
+              <Input label="結果" name="result" value={form.result} onChange={updateField} />
+              <Input label="對手" name="opponent" value={form.opponent} onChange={updateField} />
+            </div>
+
             {/* 打者 */}
             <h2 className="text-xl font-bold">打者成績</h2>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
