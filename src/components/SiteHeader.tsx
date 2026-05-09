@@ -20,6 +20,7 @@ const NAV_ITEMS = [
   { href: "/today", label: "今日出賽" },
   { href: "/players", label: "總表" },
   { href: "/calendar", label: "日曆" },
+  { href: "/rankings", label: "排行榜" },
 ];
 
 function getSearchCounts(): SearchCounts {
@@ -158,14 +159,16 @@ function NavMenu() {
   let ordered = NAV_ITEMS;
 
   if (pathname.startsWith("/today")) {
-    ordered = [NAV_ITEMS[1], NAV_ITEMS[0], NAV_ITEMS[2], NAV_ITEMS[3]];
-  } else if (pathname.startsWith("/players")) {
-    ordered = [NAV_ITEMS[2], NAV_ITEMS[0], NAV_ITEMS[1], NAV_ITEMS[3]];
-  } else if (pathname.startsWith("/calendar")) {
-    ordered = [NAV_ITEMS[3], NAV_ITEMS[0], NAV_ITEMS[1], NAV_ITEMS[2]];
-  } else {
-    ordered = NAV_ITEMS;
-  }
+  ordered = [NAV_ITEMS[1], NAV_ITEMS[0], NAV_ITEMS[2], NAV_ITEMS[3], NAV_ITEMS[4]];
+} else if (pathname.startsWith("/players")) {
+  ordered = [NAV_ITEMS[2], NAV_ITEMS[0], NAV_ITEMS[1], NAV_ITEMS[3], NAV_ITEMS[4]];
+} else if (pathname.startsWith("/calendar")) {
+  ordered = [NAV_ITEMS[3], NAV_ITEMS[0], NAV_ITEMS[1], NAV_ITEMS[2], NAV_ITEMS[4]];
+} else if (pathname.startsWith("/rankings")) {
+  ordered = [NAV_ITEMS[4], NAV_ITEMS[0], NAV_ITEMS[1], NAV_ITEMS[2], NAV_ITEMS[3]];
+} else {
+  ordered = NAV_ITEMS;
+}
 
   return (
     <details className="relative">
@@ -219,6 +222,10 @@ export default function SiteHeader({
 
             <Link href="/calendar" className="hover:text-sky-300 transition">
               日曆
+            </Link>
+
+            <Link href="/rankings" className="hover:text-sky-300 transition">
+              排行榜
             </Link>
           </nav>
         </div>

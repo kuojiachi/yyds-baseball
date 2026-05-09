@@ -6,6 +6,8 @@ import { getPlayerNameOptions } from "@/src/utils/playerNameOptions";
 import { normalizeLevel } from "@/src/utils/playerEvents";
 import PlayerPageHeader from "./_components/PlayerPageHeader";
 import PlayerStatsTabs from "./_components/PlayerStatsTabs";
+import { getPlayerScoutingReports } from "@/src/lib/playerScoutingReports";
+import PlayerScoutingReports from "./_components/PlayerScoutingReports";
 
 type PlayerPageProps = {
   params: Promise<Record<string, string>>;
@@ -101,6 +103,8 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
     );
   }
 
+  const scoutingReports = await getPlayerScoutingReports(player.id);
+
   const normalizedPlayer = {
     ...player,
     level: normalizeLevel(player.level, player.league),
@@ -159,7 +163,9 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
           player={normalizedPlayer}
           playerReports={normalizedPlayerReports}
           playerEvents={playerEvents}
+          scoutingReports={scoutingReports}
         />
+
       </section>
     </main>
   );

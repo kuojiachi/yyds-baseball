@@ -3,12 +3,14 @@
 import { useSearchParams } from "next/navigation";
 import { normalizeLevel } from "@/src/utils/playerEvents";
 import { useEffect, useMemo, useState } from "react";
-
+import PlayerScoutingReports from "./PlayerScoutingReports";
+import type { PlayerScoutingReport } from "@/src/lib/playerScoutingReports";
 
 type PlayerStatsTabsProps = {
   player: any;
   playerReports: any[];
   playerEvents: any[];
+  scoutingReports: PlayerScoutingReport[];
 };
 
 function text(value: unknown) {
@@ -183,6 +185,7 @@ export default function PlayerStatsTabs({
   player,
   playerReports,
   playerEvents,
+  scoutingReports,
 }: PlayerStatsTabsProps) {
   const searchParams = useSearchParams();
   const initialTab = searchParams.get("tab") || "current";
@@ -352,10 +355,11 @@ export default function PlayerStatsTabs({
           <option value="history">歷年成績</option>
           <option value="games">逐場紀錄</option>
           <option value="events">球員狀態總覽</option>
+          <option value="scouting">球探評分</option>
         </select>
       </div>
 
-      <div className="hidden md:grid md:grid-cols-4 border-b border-slate-800 text-sm">
+      <div className="hidden md:grid md:grid-cols-5 border-b border-slate-800 text-sm">
         <TabButton active={activeTab === "current"} onClick={() => setActiveTab("current")}>
           今年成績
         </TabButton>
@@ -370,6 +374,10 @@ export default function PlayerStatsTabs({
 
         <TabButton active={activeTab === "events"} onClick={() => setActiveTab("events")}>
           球員狀態總覽
+        </TabButton>
+
+        <TabButton active={activeTab === "scouting"} onClick={() => setActiveTab("scouting")}>
+          球探評分
         </TabButton>
       </div>
 
@@ -426,6 +434,10 @@ export default function PlayerStatsTabs({
           ) : null}
 
           {activeTab === "events" ? <EventList events={playerEvents} /> : null}
+
+          {activeTab === "scouting" ? (
+            <PlayerScoutingReports reports={scoutingReports} />
+          ) : null}
         </div>
       </div>
     </div>
