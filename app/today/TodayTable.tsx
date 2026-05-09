@@ -8,6 +8,7 @@ type TodayReport = any;
 
 type TodayTableProps = {
   todayPlayers: TodayReport[];
+  allReports: TodayReport[];
 };
 
 const ALL = "全部";
@@ -157,7 +158,7 @@ function hasPitchingStats(report: TodayReport): boolean {
   ].some(hasValue);
 }
 
-function getStats(report: TodayReport): string {
+function getStats(report: TodayReport, allReports: TodayReport[] = []): string {
   if (hasPitchingStats(report)) {
     const ipOuts = ipToOuts(report.ip);
     const ip = ipOuts / 3;
@@ -174,13 +175,13 @@ function getStats(report: TodayReport): string {
     return [
       `IP ${report.ip ?? 0}`,
       `投球數 ${report.pitch_count ?? 0}`,
-      `H ${h}`,
-      `HR ${hr}`,
-      `K ${k}`,
-      `BB ${bb}`,
+      `${h}H`,
+      `${hr}HR`,
+      `${k}K`,
+      `${bb}BB`,
       `ERA ${formatDecimal(era)}`,
       `WHIP ${formatDecimal(whip)}`,
-    ].join(" / ");
+    ].join(" | ");
   }
 
   if (hasBattingStats(report)) {
@@ -213,7 +214,7 @@ function getStats(report: TodayReport): string {
       `BB ${bb}`,
       `AVG ${formatRate(avg)}`,
       `OPS ${formatRate(ops)}`,
-    ].join(" / ");
+    ].join(" | ");
   }
 
   return "-";
@@ -235,26 +236,6 @@ function isHitter(report: TodayReport): boolean {
     type.includes("batter") ||
     type === "h"
   );
-}
-
-function formatResultText(text: unknown): string {
-  const v = normalizeText(text);
-  if (!v) return "-";
-
-  return v
-    .replace(/AVG\.?(\d+)/g, "AVG 0.$1")
-    .replace(/OBP\.?(\d+)/g, "OBP 0.$1")
-    .replace(/SLG\.?(\d+)/g, "SLG 0.$1")
-    .replace(/AVG\s+(\d+\.\d+)/g, "AVG $1")
-    .replace(/OBP\s+(\d+\.\d+)/g, "OBP $1")
-    .replace(/SLG\s+(\d+\.\d+)/g, "SLG $1")
-    .replace(/\s*ERA\s*([0-9.]+)/g, "，ERA $1")
-    .replace(/\s*WHIP\s*([0-9.]+)/g, "，WHIP $1")
-    .replace(/\s+/g, " ")
-    .replace(/，/g, "｜")
-    .replace(/\s*，\s*/g, "｜")
-    .replace(/｜\s*｜/g, "｜")
-    .replace(/\s*｜\s*/g, "｜");
 }
 
 function matchesSearch(report: TodayReport, keyword: string): boolean {
@@ -354,7 +335,7 @@ function CheckboxGroup({
   );
 }
 
-export default function TodayTable({ todayPlayers }: TodayTableProps) {
+export default function TodayTable({ todayPlayers, allReports }: TodayTableProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -562,7 +543,7 @@ export default function TodayTable({ todayPlayers }: TodayTableProps) {
 
                       <td className="p-3 text-left">{normalizeText(report.opponent) || "-"}</td>
                       <td className="p-3 text-left whitespace-normal min-w-[360px]">
-                        {formatResultText(getStats(report))}
+                        {getStats(report, allReports)}
                       </td>
                     </tr>
                   );

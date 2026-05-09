@@ -7,10 +7,26 @@ import { getPlayerNameOptions } from "@/src/utils/playerNameOptions";
 
 import TodayTable from "./TodayTable";
 
+function getTaiwanTodayDate() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Taipei",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
 export default async function TodayPage() {
-  const todayPlayers = (await getDailyReports()).filter(
-    (report: any) => String(report.result ?? "").trim() !== ""
-  );
+  const todayDate = getTaiwanTodayDate();
+
+  const reports = await getDailyReports();
+
+  const todayPlayers = reports.filter((report: any) => {
+    return (
+      String(report.report_date).slice(0, 10) === todayDate &&
+      String(report.result ?? "").trim() !== ""
+    );
+  });
   const players = await getPlayers();
   const playerNameOptions = getPlayerNameOptions(players as any);
 
@@ -30,7 +46,10 @@ export default async function TodayPage() {
             </div>
           }
         >
-          <TodayTable todayPlayers={todayPlayers as any} />
+          <TodayTable
+            todayPlayers={todayPlayers as any}
+            allReports={reports as any}
+          />
         </Suspense>
       </section>
     </main>

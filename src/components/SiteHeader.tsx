@@ -19,6 +19,7 @@ const NAV_ITEMS = [
   { href: "/", label: "TWDS", isBrand: true },
   { href: "/today", label: "今日出賽" },
   { href: "/players", label: "總表" },
+  { href: "/calendar", label: "日曆" },
 ];
 
 function getSearchCounts(): SearchCounts {
@@ -157,11 +158,13 @@ function NavMenu() {
   let ordered = NAV_ITEMS;
 
   if (pathname.startsWith("/today")) {
-    ordered = [NAV_ITEMS[1], NAV_ITEMS[0], NAV_ITEMS[2]]; // 2 1 3
+    ordered = [NAV_ITEMS[1], NAV_ITEMS[0], NAV_ITEMS[2], NAV_ITEMS[3]];
   } else if (pathname.startsWith("/players")) {
-    ordered = [NAV_ITEMS[2], NAV_ITEMS[0], NAV_ITEMS[1]]; // 3 1 2
+    ordered = [NAV_ITEMS[2], NAV_ITEMS[0], NAV_ITEMS[1], NAV_ITEMS[3]];
+  } else if (pathname.startsWith("/calendar")) {
+    ordered = [NAV_ITEMS[3], NAV_ITEMS[0], NAV_ITEMS[1], NAV_ITEMS[2]];
   } else {
-    ordered = NAV_ITEMS; // 1 2 3
+    ordered = NAV_ITEMS;
   }
 
   return (
@@ -212,6 +215,10 @@ export default function SiteHeader({
 
             <Link href="/players" className="hover:text-sky-300 transition">
               總表
+            </Link>
+
+            <Link href="/calendar" className="hover:text-sky-300 transition">
+              日曆
             </Link>
           </nav>
         </div>

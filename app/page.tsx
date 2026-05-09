@@ -5,10 +5,19 @@ import { getPlayers } from "@/src/lib/players";
 import { getDailyReports } from "@/src/lib/dailyReports";
 import { getPlayerEvents } from "@/src/lib/playerEvents";
 import { getPlayerNameOptions } from "@/src/utils/playerNameOptions";
-import { getEventDisplay } from "@/src/utils/playerEvents";
+import { getEventDisplay, normalizeLevel } from "@/src/utils/playerEvents";
 
 function text(value: unknown) {
   return String(value ?? "").trim();
+}
+
+function getTaiwanTodayDate() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Taipei",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
 }
 
 function getRelatedPlayer(row: any) {
@@ -30,24 +39,20 @@ function getPlayerTeam(row: any) {
   const playerTeam = getTeam(player);
 
   return text(
-    row.team_name ||
-      row.team ||
-      rowTeam?.name_zh ||
-      rowTeam?.name_en ||
-      rowTeam?.code ||
-      player?.team_name ||
+    player?.team_name ||
       playerTeam?.name_zh ||
       playerTeam?.name_en ||
-      playerTeam?.code
+      playerTeam?.code ||
+      "-"
   );
-}
-
-function getPlayerLevel(row: any) {
-  return text(row.level || getRelatedPlayer(row)?.level);
 }
 
 function getPlayerLeague(row: any) {
   return text(row.league || getRelatedPlayer(row)?.league);
+}
+
+function getPlayerLevel(row: any) {
+  return normalizeLevel(row.level || getRelatedPlayer(row)?.level, getPlayerLeague(row));
 }
 
 function getRegion(player: any) {
@@ -70,9 +75,9 @@ function getRegion(player: any) {
   return league || "未分類";
 }
 
-function countBy(items: any[], key: string) {
+function countByLevel(items: any[]) {
   return items.reduce((acc: Record<string, number>, item) => {
-    const value = text(item[key]) || "未分類";
+    const value = normalizeLevel(item.level, item.league) || "未分類";
     acc[value] = (acc[value] || 0) + 1;
     return acc;
   }, {});
@@ -89,9 +94,11 @@ const LEVEL_ORDER: Record<string, number> = {
   A: 5,
   Rookie: 6,
   RK: 6,
-  一軍: 7,
-  二軍: 8,
-  三軍: 9,
+  日職一軍: 7,
+  日職二軍: 8,
+  韓職一軍: 9,
+  韓職二軍: 10,
+  三軍: 11,
 };
 
 function levelRank(level: unknown) {
@@ -101,7 +108,6 @@ function levelRank(level: unknown) {
 function isTopTodayReport(report: any) {
   const level = getPlayerLevel(report).toUpperCase();
   const rawLevel = getPlayerLevel(report);
-  const league = getPlayerLeague(report);
 
   return (
     level === "MLB" ||
@@ -109,8 +115,8 @@ function isTopTodayReport(report: any) {
     level === "AAA" ||
     level === "2A" ||
     level === "AA" ||
-    (league === "日職" && rawLevel === "一軍") ||
-    (league === "韓職" && rawLevel === "一軍")
+    rawLevel === "日職一軍" ||
+    rawLevel === "韓職一軍"
   );
 }
 
@@ -135,9 +141,7 @@ function getILDays(event: any) {
 
   const totalDays = status.replace("IL", "");
 
-  if (!totalDays) {
-    return `傷兵名單(${passedDays})`;
-  }
+  if (!totalDays) return `傷兵名單(${passedDays})`;
 
   return `傷兵名單(${passedDays}/${totalDays})`;
 }
@@ -179,6 +183,44 @@ function isReturnEvent(event: any) {
   return eventType === "active" || status === "active";
 }
 
+function isMovementEvent(event: any) {
+  const eventType = text(event.event_type).toLowerCase();
+
+  return [
+    "promotion",
+    "recall",
+    "option",
+    "demotion",
+    "assign",
+    "trade",
+    "dfa",
+    "waiver_claim",
+    "free_agent",
+    "contract_selected",
+    "non_tender",
+    "active",
+  ].includes(eventType);
+}
+
+function getUniqueLatestEvents(events: any[]) {
+  const latestByPlayer = new Map<string, any>();
+
+  [...events]
+    .sort((a: any, b: any) => {
+      return String(b.event_date || "").localeCompare(String(a.event_date || ""));
+    })
+    .forEach((event: any) => {
+      const playerId = text(event.player_id || getRelatedPlayer(event)?.id);
+      if (!playerId) return;
+
+      if (!latestByPlayer.has(playerId)) {
+        latestByPlayer.set(playerId, event);
+      }
+    });
+
+  return Array.from(latestByPlayer.values());
+}
+
 function getCurrentInjuryEvents(events: any[]) {
   const latestByPlayer = new Map<string, any>();
 
@@ -189,6 +231,7 @@ function getCurrentInjuryEvents(events: any[]) {
     .forEach((event: any) => {
       const playerId = text(event.player_id || getRelatedPlayer(event)?.id);
       if (!playerId) return;
+
       if (!latestByPlayer.has(playerId)) {
         latestByPlayer.set(playerId, event);
       }
@@ -211,29 +254,29 @@ export default async function Home() {
     (players as any[]).map((player: any) => [player.id, player])
   );
 
+  const playersByName = new Map(
+    (players as any[]).map((player: any) => [player.name_zh, player])
+  );
+
   const enrichedEvents = (events as any[]).map((event: any) => {
-    const player = playersById.get(event.player_id);
+    const player =
+      playersById.get(event.player_id) ||
+      playersByName.get(event.name_zh);
 
     return {
       ...event,
       name_zh: event.name_zh || player?.name_zh,
-      team_name: event.team_name || player?.team_name,
-      level: event.level || player?.level,
+      team_name: player?.team_name,
+      level: normalizeLevel(event.level || player?.level, event.league || player?.league),
+      from_level: normalizeLevel(event.from_level, event.league || player?.league),
+      to_level: normalizeLevel(event.to_level, event.league || player?.league),
       league: event.league || player?.league,
       players: event.players || player,
     };
   });
 
   const recentMovementEvents = enrichedEvents.filter((event: any) => {
-    const eventType = text(event.event_type);
-
-    return (
-      isWithinLastDays(event.event_date, 7) &&
-      (eventType === "promotion" ||
-        eventType === "recall" ||
-        eventType === "option" ||
-        eventType === "assign")
-    );
+    return isWithinLastDays(event.event_date, 7) && isMovementEvent(event);
   });
 
   const currentInjuryEvents = getCurrentInjuryEvents(enrichedEvents);
@@ -251,23 +294,28 @@ export default async function Home() {
         player.teams?.name_zh ||
         player.teams?.name_en ||
         "-",
-      level: player.level || "-",
+      level: normalizeLevel(player.level, player.league) || "-",
+      league: player.league,
       note: player.status,
       source: "players",
     }));
 
-  const movedPlayers = [...injuredPlayers, ...currentInjuryEvents, ...recentMovementEvents]
+  const movedPlayers = getUniqueLatestEvents([
+    ...currentInjuryEvents,
+    ...recentMovementEvents,
+    ...injuredPlayers,
+  ])
     .sort((a: any, b: any) => {
       return levelRank(a.level || a.to_level) - levelRank(b.level || b.to_level);
     })
     .slice(0, 10);
 
-  const latestDate = reports[0]?.report_date;
+  const todayDate = getTaiwanTodayDate();
 
   const topTodayReports = reports
     .filter(
       (r: any) =>
-        r.report_date === latestDate &&
+        r.report_date === todayDate &&
         isTopTodayReport(r) &&
         String(r.result ?? "").trim() !== ""
     )
@@ -284,9 +332,10 @@ export default async function Home() {
     return acc;
   }, {});
 
-  const levelCounts = countBy(players, "level");
+  const levelCounts = countByLevel(players as any[]);
 
   const regionOrder = ["美職", "日職", "韓職", "台裔", "其他", "未分類"];
+
   const levelOrder = [
     "MLB",
     "3A",
@@ -295,8 +344,10 @@ export default async function Home() {
     "1A",
     "A",
     "Rookie",
-    "一軍",
-    "二軍",
+    "日職一軍",
+    "日職二軍",
+    "韓職一軍",
+    "韓職二軍",
     "三軍",
     "其他",
     "未分類",
@@ -315,7 +366,7 @@ export default async function Home() {
   });
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white p-6">
+    <main className="min-h-screen bg-slate-950 text-white p-4 sm:p-6">
       <section className="w-full max-w-7xl mx-auto">
         <SiteHeader
           subtitle="台灣旅外球員追蹤系統"
@@ -323,7 +374,7 @@ export default async function Home() {
           playerNameOptions={playerNameOptions as any}
         />
 
-        <div className="flex flex-col gap-10">
+        <div className="flex flex-col gap-8">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full">
             <div className="bg-slate-900 rounded-2xl h-32 border border-slate-800 hover:bg-slate-800/60 relative px-6 pt-4">
               <p className="text-slate-400 text-sm absolute top-4 left-6">
@@ -353,7 +404,7 @@ export default async function Home() {
             </div>
           </div>
 
-          <div className="mt-[40px] bg-slate-900 rounded-2xl border border-slate-700 overflow-hidden shadow-xl shadow-black/30">
+          <div className="bg-slate-900 rounded-2xl border border-slate-700 overflow-hidden shadow-xl shadow-black/30">
             <div className="p-5 border-b border-slate-800">
               <h2 className="text-xl font-bold">異動球員</h2>
               <p className="text-slate-400 text-sm mt-1">近一周升降與傷兵</p>
@@ -367,7 +418,7 @@ export default async function Home() {
                       球員
                     </th>
                     <th className="text-left p-3 w-[140px] min-w-[140px]">球隊</th>
-                    <th className="text-left p-3 w-[80px] min-w-[80px]">層級</th>
+                    <th className="text-left p-3 w-[100px] min-w-[100px]">層級</th>
                     <th className="text-left p-3">異動</th>
                     <th className="text-left p-3">狀態</th>
                   </tr>
@@ -403,20 +454,17 @@ export default async function Home() {
                           </td>
 
                           <td className="p-3 text-left w-[140px] min-w-[140px]">
-                            {event.team_name || getPlayerTeam(event) || eventDisplay.team || "-"}
+                            {getPlayerTeam(event) || "-"}
                           </td>
 
-                          <td className="p-3 text-left w-[80px] min-w-[80px]">
-                            {event.source === "players"
-                              ? event.level || "-"
-                              : getPlayerLevel(event)}
+                          <td className="p-3 text-left w-[100px] min-w-[100px]">
+                            {normalizeLevel(event.level || event.to_level, event.league) || "-"}
                           </td>
 
                           <td className="p-3 text-left">
                             {eventDisplay.type === "movement" ? (
                               <span className={eventDisplay.colorClass}>
-                                {getILDays(event) || eventDisplay.label}
-                                {text(event.note) ? `，${text(event.note)}` : ""}
+                                {eventDisplay.label}
                               </span>
                             ) : (
                               <span className="text-slate-500">-</span>
@@ -454,7 +502,7 @@ export default async function Home() {
             <div className="p-5 border-b border-slate-800">
               <h2 className="text-xl font-bold">今日戰報｜2A 以上</h2>
               <p className="text-slate-400 text-sm mt-1">
-                只顯示 MLB、NPB 一軍、KBO 一軍、3A、2A
+                只顯示今天台灣日期的 MLB、NPB 一軍、KBO 一軍、3A、2A
               </p>
             </div>
 
@@ -466,7 +514,7 @@ export default async function Home() {
                       球員
                     </th>
                     <th className="text-left p-3 w-[140px] min-w-[140px]">球隊</th>
-                    <th className="text-left p-3 w-[80px] min-w-[80px]">層級</th>
+                    <th className="text-left p-3 w-[100px] min-w-[100px]">層級</th>
                     <th className="text-left p-3 w-[140px] min-w-[140px]">對手</th>
                     <th className="text-left p-3 w-[140px] min-w-[140px]">成績</th>
                   </tr>
@@ -493,7 +541,7 @@ export default async function Home() {
                       <td className="p-3 text-left w-[140px] min-w-[140px]">
                         {getPlayerTeam(report) || "-"}
                       </td>
-                      <td className="p-3 text-left w-[80px] min-w-[80px]">
+                      <td className="p-3 text-left w-[100px] min-w-[100px]">
                         {getPlayerLevel(report) || "-"}
                       </td>
                       <td className="p-3 text-left whitespace-nowrap">

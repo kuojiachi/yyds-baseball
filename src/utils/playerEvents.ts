@@ -17,6 +17,43 @@ function text(value: unknown) {
   return String(value ?? "").trim();
 }
 
+export function normalizeLevel(value: unknown, league?: unknown) {
+  const raw = text(value);
+  const leagueText = text(league);
+
+  if (!raw) return "";
+
+  if (raw === "日職一軍" || raw === "NPB一軍") return "日職一軍";
+  if (raw === "日職二軍" || raw === "NPB二軍") return "日職二軍";
+  if (raw === "韓職一軍" || raw === "KBO一軍") return "韓職一軍";
+  if (raw === "韓職二軍" || raw === "KBO二軍") return "韓職二軍";
+
+  if (raw === "一軍") {
+    if (leagueText.includes("韓") || leagueText.toUpperCase().includes("KBO")) {
+      return "韓職一軍";
+    }
+    return "日職一軍";
+  }
+
+  if (raw === "二軍") {
+    if (leagueText.includes("韓") || leagueText.toUpperCase().includes("KBO")) {
+      return "韓職二軍";
+    }
+    return "日職二軍";
+  }
+
+  return raw;
+}
+
+export function displayShortLevel(value: unknown, league?: unknown) {
+  const level = normalizeLevel(value, league);
+
+  if (level === "日職一軍" || level === "韓職一軍") return "一軍";
+  if (level === "日職二軍" || level === "韓職二軍") return "二軍";
+
+  return level || "-";
+}
+
 export function formatEventDate(value: unknown) {
   const raw = text(value);
   if (!raw) return "-";
@@ -34,15 +71,16 @@ export function getEventDisplay(event: PlayerEvent) {
   const eventType = text(event.event_type);
   const fromTeam = text(event.from_team);
   const toTeam = text(event.to_team);
-  const fromLevel = text(event.from_level);
-  const toLevel = text(event.to_level);
+
+  const fromLevel = normalizeLevel(event.from_level, event.league);
+  const toLevel = normalizeLevel(event.to_level, event.league);
 
   const team = toTeam || fromTeam || "-";
   const level = toLevel || fromLevel || "-";
 
-  if (eventType === "promotion") {
+  if (eventType === "promotion" || eventType === "recall") {
     return {
-      label: toLevel ? `↑ 升${toLevel}` : "升級",
+      label: `↑ 升${displayShortLevel(toLevel || "一軍", event.league)}`,
       type: "movement",
       team,
       level,
@@ -50,9 +88,9 @@ export function getEventDisplay(event: PlayerEvent) {
     };
   }
 
-  if (eventType === "demotion") {
+  if (eventType === "demotion" || eventType === "option") {
     return {
-      label: toLevel ? `↓ 降${toLevel}` : "降級",
+      label: `↓ 降${displayShortLevel(toLevel || "二軍", event.league)}`,
       type: "movement",
       team,
       level,
@@ -60,7 +98,7 @@ export function getEventDisplay(event: PlayerEvent) {
     };
   }
 
-  if (eventType === "transfer") {
+  if (eventType === "transfer" || eventType === "trade") {
     return {
       label: toTeam ? `轉隊 ${toTeam}` : "轉隊",
       type: "movement",
@@ -100,6 +138,16 @@ export function getEventDisplay(event: PlayerEvent) {
     };
   }
 
+  if (eventType === "active") {
+    return {
+      label: `↑ 升${displayShortLevel(toLevel || "一軍", event.league)}`,
+      type: "movement",
+      team,
+      level: toLevel || normalizeLevel("一軍", event.league),
+      colorClass: "text-green-400",
+    };
+  }
+
   if (eventType === "activated") {
     return {
       label: "現役",
@@ -120,9 +168,9 @@ export function getEventDisplay(event: PlayerEvent) {
     };
   }
 
-  if (eventType === "released") {
+  if (eventType === "released" || eventType === "free_agent") {
     return {
-      label: "釋出",
+      label: eventType === "free_agent" ? "自由球員" : "釋出",
       type: "status",
       team,
       level,

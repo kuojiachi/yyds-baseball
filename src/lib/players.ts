@@ -1,8 +1,9 @@
-import { supabase } from './supabase'
+import { supabase } from "./supabase";
+import { normalizeLevel } from "@/src/utils/playerEvents";
 
 export async function getPlayers() {
   const { data, error } = await supabase
-    .from('players')
+    .from("players")
     .select(`
       id,
       name_zh,
@@ -24,12 +25,15 @@ export async function getPlayers() {
         name_en
       )
     `)
-    .order('name_zh', { ascending: true })
+    .order("name_zh", { ascending: true });
 
   if (error) {
-    console.error('getPlayers error:', error.message)
-    return []
+    console.error("getPlayers error:", error.message);
+    return [];
   }
 
-  return data ?? []
+  return (data ?? []).map((player: any) => ({
+    ...player,
+    level: normalizeLevel(player.level, player.league),
+  }));
 }

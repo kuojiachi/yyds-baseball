@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { normalizeLevel } from "@/src/utils/playerEvents";
 
 function pickTeamName(teams: any) {
   const team = Array.isArray(teams) ? teams[0] : teams;
@@ -34,11 +35,11 @@ export async function getPlayerEvents() {
         level,
         team_name,
         teams!players_current_team_id_fkey (
-        id,
-        name_zh,
-        name_en,
-        code
-      )
+          id,
+          name_zh,
+          name_en,
+          code
+        )
       )
     `)
     .not("event_type", "is", null)
@@ -53,13 +54,16 @@ export async function getPlayerEvents() {
 
   return (data || []).map((event: any) => {
     const player = pickPlayer(event.players);
+    const league = event.league || player?.league;
 
     return {
       ...event,
       name_zh: event.name_zh || player?.name_zh,
       team_name: event.team_name || player?.team_name || pickTeamName(player?.teams),
-      level: event.level || player?.level,
-      league: event.league || player?.league,
+      level: normalizeLevel(event.level || player?.level, league),
+      from_level: normalizeLevel(event.from_level, league),
+      to_level: normalizeLevel(event.to_level, league),
+      league,
     };
   });
 }

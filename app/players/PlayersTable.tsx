@@ -298,9 +298,12 @@ export default function PlayersTable({ players, events }: PlayersTableProps) {
                 const rawStatus =
                   eventDisplay?.type === "status"
                     ? eventDisplay.label
-                    : player.status || "現役";
+                    : player.status || "active";
 
-                const status = rawStatus === "現役" ? "-" : rawStatus;
+                const playerStatus =
+                  rawStatus === "active" || rawStatus === "現役"
+                    ? "-"
+                    : rawStatus;
 
                 return (
                   <tr
@@ -323,7 +326,7 @@ export default function PlayersTable({ players, events }: PlayersTableProps) {
                     </td>
                     <td className="p-3">{player.level || "-"}</td>
                     <td className="p-3 text-green-400">{movement}</td>
-                    <td className="p-3 text-yellow-400">{status}</td>
+                    <td className="p-3 text-yellow-400">{playerStatus}</td>
                   </tr>
                 );
               })}
