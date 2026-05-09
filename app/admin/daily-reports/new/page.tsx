@@ -50,6 +50,8 @@ function toNumberOrNull(value: string) {
 }
 
 export default function NewDailyReportPage() {
+  const [search, setSearch] = useState("");
+
   const [players, setPlayers] = useState<Player[]>([]);
   const [form, setForm] = useState(emptyForm);
   const [message, setMessage] = useState("");
@@ -72,6 +74,12 @@ export default function NewDailyReportPage() {
 
     loadPlayers();
   }, []);
+
+  const filteredPlayers = players.filter((p) =>
+    `${p.name_zh}${p.name_en ?? ""}`
+      .toLowerCase()
+      .includes(search.toLowerCase())
+  );
 
   function updateField(name: string, value: string) {
     setForm((prev) => ({
@@ -163,6 +171,39 @@ export default function NewDailyReportPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 className="mt-2 w-full rounded-xl bg-slate-800 border border-slate-700 p-3"
               />
+            </div>
+
+            <div>
+              <label className="text-sm text-slate-400">搜尋球員</label>
+            
+              <input
+                placeholder="輸入姓名..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="mt-2 w-full rounded-xl bg-slate-800 border border-slate-700 p-3"
+              />
+            
+              <div className="mt-2 max-h-40 overflow-y-auto border border-slate-700 rounded-xl">
+                {filteredPlayers.map((player) => (
+                  <div
+                    key={player.id}
+                    onClick={() => updateField("player_id", player.id)}
+                    className={`p-3 cursor-pointer hover:bg-slate-700 ${
+                      form.player_id === player.id ? "bg-blue-600" : ""
+                    }`}
+                  >
+                    {player.name_zh}
+                    {player.name_en ? ` ｜ ${player.name_en}` : ""}
+                  </div>
+                ))}
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <Input label="日期" type="date" name="report_date" value={form.report_date} onChange={updateField} />
+              <Input label="守位" name="position" value={form.position} onChange={updateField} />
+              <Input label="結果" name="result" value={form.result} onChange={updateField} />
+              <Input label="對手" name="opponent" value={form.opponent} onChange={updateField} />
             </div>
 
             {/* 打者 */}
