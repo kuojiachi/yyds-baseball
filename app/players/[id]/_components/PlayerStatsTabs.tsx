@@ -2,15 +2,16 @@
 
 import { useSearchParams } from "next/navigation";
 import { normalizeLevel } from "@/src/utils/playerEvents";
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import PlayerScoutingReports from "./PlayerScoutingReports";
-import type { PlayerScoutingReport } from "@/src/lib/playerScoutingReports";
 
 type PlayerStatsTabsProps = {
   player: any;
   playerReports: any[];
   playerEvents: any[];
-  scoutingReports: PlayerScoutingReport[];
+  scoutingReports: any[];
+  currentSeasonStats?: any[];
+  seasonStats?: any[];
 };
 
 function text(value: unknown) {
@@ -38,9 +39,10 @@ function displayGameType(value: unknown) {
   return type || "-";
 }
 
-function getYear(date: unknown) {
-  const v = text(date);
-  return v ? v.slice(0, 4) : "-";
+function displayTeamName(team?: string | null) {
+  const value = String(team ?? "").trim();
+  if (!value) return "-";
+  return value.split("-")[0];
 }
 
 function isPitcher(player: any) {
@@ -48,38 +50,27 @@ function isPitcher(player: any) {
   return position.includes("投") || position.includes("pitcher") || position === "p";
 }
 
-function getLevel(report: any, player: any) {
-  return displayValue(
-    normalizeLevel(
-      report.level || report.player_level || player.level,
-      report.league || player.league
-    )
-  );
-}
-
-function getTeam(report: any, player: any) {
-  return displayValue(
-    report.team_name ||
-      report.team ||
-      player.teams?.name_zh ||
-      player.teams?.name_en ||
-      player.team_name
-  );
-}
-
 function safeDivide(top: number, bottom: number) {
   if (!bottom) return null;
   return top / bottom;
 }
 
-function formatRate(value: number | null) {
-  if (value === null || !Number.isFinite(value)) return "-";
-  return value.toFixed(3).replace(/^0/, "");
+function formatRate(value: unknown) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "-";
+  return n.toFixed(3).replace(/^0/, "");
 }
 
-function formatDecimal(value: number | null) {
-  if (value === null || !Number.isFinite(value)) return "-";
-  return value.toFixed(2);
+function formatDecimal(value: unknown) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "-";
+  return n.toFixed(2);
+}
+
+function formatPercent(value: unknown) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "-";
+  return `${(n * 100).toFixed(1)}%`;
 }
 
 function ipToOuts(ipValue: unknown) {
@@ -101,78 +92,17 @@ function outsToIp(outs: number) {
   return `${whole}.${rest}`;
 }
 
-function getTotal(rows: any[]) {
-  return rows.reduce(
-    (sum: any, row: any) => {
-      sum.games += toNumber(row.games);
-      sum.ab += toNumber(row.ab);
-      sum.pa += toNumber(row.pa);
-      sum.r += toNumber(row.r);
-      sum.h += toNumber(row.h);
-      sum.rbi += toNumber(row.rbi);
-      sum.bb += toNumber(row.bb);
-      sum.k += toNumber(row.k);
-      sum.hr += toNumber(row.hr);
-      sum.doubles += toNumber(row.doubles);
-      sum.triples += toNumber(row.triples);
-      sum.sb += toNumber(row.sb);
-      sum.hbp += toNumber(row.hbp);
-      sum.sf += toNumber(row.sf);
-
-      sum.ipOuts += toNumber(row.ipOuts);
-      sum.er += toNumber(row.er);
-      sum.bf += toNumber(row.bf);
-      sum.pitchCount += toNumber(row.pitchCount);
-      sum.win += toNumber(row.win);
-      sum.loss += toNumber(row.loss);
-      sum.hold += toNumber(row.hold);
-      sum.save += toNumber(row.save);
-
-      return sum;
-    },
-    {
-      games: 0,
-      ab: 0,
-      pa: 0,
-      r: 0,
-      h: 0,
-      rbi: 0,
-      bb: 0,
-      k: 0,
-      hr: 0,
-      doubles: 0,
-      triples: 0,
-      sb: 0,
-      hbp: 0,
-      sf: 0,
-      ipOuts: 0,
-      er: 0,
-      bf: 0,
-      pitchCount: 0,
-      win: 0,
-      loss: 0,
-      hold: 0,
-      save: 0,
-    }
-  );
-}
-
-function getEventContent(event: any) {
-  return displayValue(
-    event.note ||
-      event.to_team ||
-      event.to_level ||
-      event.status ||
-      event.event_type
-  );
-}
-
 const LEVEL_ORDER = [
   "MLB",
+  "AAA",
   "3A",
+  "AA",
   "2A",
   "A+",
+  "High-A",
+  "A",
   "1A",
+  "ROK",
   "RK",
   "日職一軍",
   "日職二軍",
@@ -181,170 +111,328 @@ const LEVEL_ORDER = [
   "韓職二軍",
 ];
 
+function sortLevel(a: string, b: string) {
+  const aIndex = LEVEL_ORDER.indexOf(a);
+  const bIndex = LEVEL_ORDER.indexOf(b);
+
+  if (aIndex === -1 && bIndex === -1) return a.localeCompare(b);
+  if (aIndex === -1) return 1;
+  if (bIndex === -1) return -1;
+
+  return aIndex - bIndex;
+}
+
+function getSeasonYear(row: any) {
+  return text(row.season_year || row.season || row.year);
+}
+
+function getSeasonTeam(row: any) {
+  return displayTeamName(
+    row.team_name ||
+      row.team_name_zh ||
+      row.team ||
+      row.team_code ||
+      row.teams?.name_zh ||
+      row.teams?.name_en
+  );
+}
+
+function getSeasonLevel(row: any) {
+  return displayValue(row.level || row.player_level || row.stat_level);
+}
+
+function normalizeSeasonRow(row: any) {
+  const h = toNumber(row.h);
+  const doubles = toNumber(row.doubles ?? row.double ?? row.two_b);
+  const triples = toNumber(row.triples ?? row.triple ?? row.three_b);
+  const hr = toNumber(row.hr);
+  const tb =
+    row.tb !== null && row.tb !== undefined && row.tb !== ""
+      ? toNumber(row.tb)
+      : h - doubles - triples - hr + doubles * 2 + triples * 3 + hr * 4;
+
+  const ipOuts =
+    row.ip_outs !== null && row.ip_outs !== undefined && row.ip_outs !== ""
+      ? toNumber(row.ip_outs)
+      : ipToOuts(row.ip_display || row.ip);
+
+  return {
+    raw: row,
+
+    year: getSeasonYear(row),
+    team: getSeasonTeam(row),
+    level: getSeasonLevel(row),
+
+    games: toNumber(row.g),
+    pa: toNumber(row.pa),
+    ab: toNumber(row.ab),
+    r: toNumber(row.r),
+    h,
+    tb,
+    doubles,
+    triples,
+    hr,
+    rbi: toNumber(row.rbi),
+    bb: toNumber(row.bb),
+    ibb: toNumber(row.ibb),
+    hbp: toNumber(row.hbp),
+    k: toNumber(row.k ?? row.so),
+    sb: toNumber(row.sb),
+    cs: toNumber(row.cs),
+    sf: toNumber(row.sf),
+
+    avg: row.official_avg ?? row.avg,
+    obp: row.official_obp ?? row.obp,
+    slg: row.official_slg ?? row.slg,
+    ops: row.official_ops ?? row.ops,
+    goAo: row.go_ao,
+    kRate: row.official_k_rate ?? row.k_rate,
+    bbRate: row.official_bb_rate ?? row.bb_rate,
+    babip: row.official_babip ?? row.babip,
+
+    win: toNumber(row.win ?? row.w),
+    loss: toNumber(row.loss ?? row.l),
+    era: row.official_era ?? row.era,
+    gs: toNumber(row.gs),
+    cg: toNumber(row.cg),
+    sho: toNumber(row.sho),
+    hold: toNumber(row.hold ?? row.hld),
+    save: toNumber(row.save ?? row.sv),
+    svo: toNumber(row.svo),
+    ipOuts,
+    ipDisplay: row.ip_display || row.ip,
+    er: toNumber(row.er),
+    pitchCount: toNumber(row.pitch_count ?? row.np),
+    whip: row.official_whip ?? row.whip,
+    avgAgainst: row.official_avg_against ?? row.avg_against ?? row.avg,
+  };
+}
+
+function getTotal(rows: any[]) {
+  return rows.reduce(
+    (sum, row) => {
+      sum.games += toNumber(row.games);
+      sum.pa += toNumber(row.pa);
+      sum.ab += toNumber(row.ab);
+      sum.r += toNumber(row.r);
+      sum.h += toNumber(row.h);
+      sum.tb += toNumber(row.tb);
+      sum.doubles += toNumber(row.doubles);
+      sum.triples += toNumber(row.triples);
+      sum.hr += toNumber(row.hr);
+      sum.rbi += toNumber(row.rbi);
+      sum.bb += toNumber(row.bb);
+      sum.ibb += toNumber(row.ibb);
+      sum.hbp += toNumber(row.hbp);
+      sum.k += toNumber(row.k);
+      sum.sb += toNumber(row.sb);
+      sum.cs += toNumber(row.cs);
+      sum.sf += toNumber(row.sf);
+
+      sum.win += toNumber(row.win);
+      sum.loss += toNumber(row.loss);
+      sum.gs += toNumber(row.gs);
+      sum.cg += toNumber(row.cg);
+      sum.sho += toNumber(row.sho);
+      sum.hold += toNumber(row.hold);
+      sum.save += toNumber(row.save);
+      sum.svo += toNumber(row.svo);
+      sum.ipOuts += toNumber(row.ipOuts);
+      sum.er += toNumber(row.er);
+      sum.pitchCount += toNumber(row.pitchCount);
+
+      return sum;
+    },
+    {
+      games: 0,
+      pa: 0,
+      ab: 0,
+      r: 0,
+      h: 0,
+      tb: 0,
+      doubles: 0,
+      triples: 0,
+      hr: 0,
+      rbi: 0,
+      bb: 0,
+      ibb: 0,
+      hbp: 0,
+      k: 0,
+      sb: 0,
+      cs: 0,
+      sf: 0,
+
+      win: 0,
+      loss: 0,
+      gs: 0,
+      cg: 0,
+      sho: 0,
+      hold: 0,
+      save: 0,
+      svo: 0,
+      ipOuts: 0,
+      er: 0,
+      pitchCount: 0,
+    }
+  );
+}
+
+function getHitterTotalRow(rows: any[], label = "合計") {
+  const total = getTotal(rows);
+
+  const avg = safeDivide(total.h, total.ab);
+  const obp = safeDivide(
+    total.h + total.bb + total.hbp,
+    total.ab + total.bb + total.hbp + total.sf
+  );
+  const slg = safeDivide(total.tb, total.ab);
+  const ops = obp !== null && slg !== null ? obp + slg : null;
+
+  return {
+    year: label,
+    team: "-",
+    level: "合計",
+    ...total,
+    avg,
+    obp,
+    slg,
+    ops,
+    goAo: "-",
+    kRate: safeDivide(total.k, total.pa),
+    bbRate: safeDivide(total.bb, total.pa),
+    babip: safeDivide(total.h - total.hr, total.ab - total.k - total.hr + total.sf),
+  };
+}
+
+function getPitcherTotalRow(rows: any[], label = "合計") {
+  const total = getTotal(rows);
+  const ip = total.ipOuts / 3;
+
+  return {
+    year: label,
+    team: "-",
+    level: "合計",
+    ...total,
+    era: safeDivide(total.er * 9, ip),
+    ipDisplay: outsToIp(total.ipOuts),
+    avgAgainst: "-",
+    whip: safeDivide(total.bb + total.h, ip),
+    goAo: "-",
+    k9: safeDivide(total.k * 9, ip),
+    bb9: safeDivide(total.bb * 9, ip),
+    hr9: safeDivide(total.hr * 9, ip),
+    h9: safeDivide(total.h * 9, ip),
+    kbb: safeDivide(total.k, total.bb),
+  };
+}
+
+function getEventContent(event: any) {
+  return displayValue(
+    event.note || event.to_team || event.to_level || event.status || event.event_type
+  );
+}
+
 export default function PlayerStatsTabs({
   player,
   playerReports,
   playerEvents,
   scoutingReports,
+  currentSeasonStats = [],
+  seasonStats = [],
 }: PlayerStatsTabsProps) {
   const searchParams = useSearchParams();
   const initialTab = searchParams.get("tab") || "current";
   const gameDate = searchParams.get("date") || "";
 
   const [activeTab, setActiveTab] = useState(initialTab);
+  const [expandedYears, setExpandedYears] = useState<string[]>([
+    String(new Date().getFullYear()),
+  ]);
   const [levelFilter, setLevelFilter] = useState("全部");
   const [yearFilter, setYearFilter] = useState("全部");
+
   const pitcher = isPitcher(player);
+  const currentYear = String(new Date().getFullYear());
 
   useEffect(() => {
     setActiveTab(initialTab);
   }, [initialTab]);
 
-  const filteredReports = useMemo(() => {
-    if (levelFilter === "全部") return playerReports;
+  function toggleYear(year: string) {
+    setExpandedYears((prev) =>
+      prev.includes(year) ? prev.filter((v) => v !== year) : [...prev, year]
+    );
+  }
 
-    return playerReports.filter((report) => {
-      return getLevel(report, player) === levelFilter;
-    });
-  }, [levelFilter, playerReports, player]);
+  const allRows = useMemo(() => {
+    const source = activeTab === "current" ? currentSeasonStats : seasonStats;
 
-  const historyRows = useMemo(() => {
-    const map: Record<string, any> = {};
+    return source
+      .map(normalizeSeasonRow)
+      .filter((row) => {
+        if (levelFilter !== "全部") return row.level === levelFilter;
+        return true;
+      })
+      .sort((a, b) => {
+        const yearDiff = Number(b.year) - Number(a.year);
+        if (yearDiff !== 0) return yearDiff;
 
-    for (const report of filteredReports) {
-      if (activeTab === "current") {
-        const type = report.game_type || "regular";
-        if (type !== "regular") continue;
-      }
+        const levelDiff = sortLevel(String(a.level), String(b.level));
+        if (levelDiff !== 0) return levelDiff;
 
-      const year = getYear(report.report_date);
-      const team = getTeam(report, player);
-      const level = getLevel(report, player);
-      const key = `${year}-${team}-${level}`;
-
-      if (!map[key]) {
-        map[key] = {
-          year,
-          team,
-          level,
-          games: 0,
-          ab: 0,
-          pa: 0,
-          r: 0,
-          h: 0,
-          rbi: 0,
-          bb: 0,
-          k: 0,
-          hr: 0,
-          doubles: 0,
-          triples: 0,
-          sb: 0,
-          hbp: 0,
-          sf: 0,
-          ipOuts: 0,
-          er: 0,
-          bf: 0,
-          pitchCount: 0,
-          win: 0,
-          loss: 0,
-          hold: 0,
-          save: 0,
-        };
-      }
-
-      map[key].games += 1;
-
-      map[key].ab += toNumber(report.ab);
-      map[key].pa += toNumber(report.pa);
-      map[key].r += toNumber(report.r);
-      map[key].h += toNumber(report.h);
-      map[key].rbi += toNumber(report.rbi);
-      map[key].bb += toNumber(report.bb);
-      map[key].k += toNumber(report.k);
-      map[key].hr += toNumber(report.hr);
-      map[key].doubles += toNumber(report.doubles);
-      map[key].triples += toNumber(report.triples);
-      map[key].sb += toNumber(report.sb);
-      map[key].hbp += toNumber(report.hbp);
-      map[key].sf += toNumber(report.sf);
-
-      map[key].ipOuts += ipToOuts(report.ip);
-      map[key].er += toNumber(report.er);
-      map[key].bf += toNumber(report.bf);
-      map[key].pitchCount += toNumber(report.pitch_count);
-      map[key].win += toNumber(report.win);
-      map[key].loss += toNumber(report.loss);
-      map[key].hold += toNumber(report.hold);
-      map[key].save += toNumber(report.save);
-    }
-
-    return Object.values(map).sort((a: any, b: any) => {
-      const yearDiff = Number(b.year) - Number(a.year);
-      if (yearDiff !== 0) return yearDiff;
-
-      const teamDiff = String(a.team).localeCompare(String(b.team));
-      if (teamDiff !== 0) return teamDiff;
-
-      const aLevelIndex = LEVEL_ORDER.indexOf(String(a.level));
-      const bLevelIndex = LEVEL_ORDER.indexOf(String(b.level));
-
-      const aRank = aLevelIndex === -1 ? 999 : aLevelIndex;
-      const bRank = bLevelIndex === -1 ? 999 : bLevelIndex;
-
-      return aRank - bRank;
-    });
-  }, [filteredReports, player, activeTab]);
+        return String(a.team).localeCompare(String(b.team));
+      });
+  }, [activeTab, currentSeasonStats, seasonStats, levelFilter]);
 
   const levelOptions = useMemo(() => {
+    const source = activeTab === "current" ? currentSeasonStats : seasonStats;
+
     const levels = Array.from(
-      new Set(historyRows.map((row: any) => String(row.level)).filter(Boolean))
+      new Set(source.map((row) => getSeasonLevel(row)).filter((v) => v && v !== "-"))
     );
 
-    return [
-      "全部",
-      ...levels.sort((a, b) => {
-        const aIndex = LEVEL_ORDER.indexOf(a);
-        const bIndex = LEVEL_ORDER.indexOf(b);
-
-        if (aIndex === -1 && bIndex === -1) return a.localeCompare(b);
-        if (aIndex === -1) return 1;
-        if (bIndex === -1) return -1;
-
-        return aIndex - bIndex;
-      }),
-    ];
-  }, [historyRows]);
+    return ["全部", ...levels.sort(sortLevel)];
+  }, [activeTab, currentSeasonStats, seasonStats]);
 
   const yearOptions = useMemo(() => {
     const years = Array.from(
-      new Set(historyRows.map((row: any) => String(row.year)).filter(Boolean))
+      new Set(allRows.map((row) => String(row.year)).filter(Boolean))
     );
 
     return ["全部", ...years.sort((a, b) => Number(b) - Number(a))];
-  }, [historyRows]);
+  }, [allRows]);
 
-  const filteredHistoryRows = useMemo(() => {
-    if (yearFilter === "全部") return historyRows;
-
-    return historyRows.filter((row: any) => {
-      return String(row.year) === 
-      yearFilter;
-    });
-  }, [historyRows, yearFilter]);
-
-  const currentYear = String(new Date().getFullYear());
+  const filteredRows = useMemo(() => {
+    if (yearFilter === "全部") return allRows;
+    return allRows.filter((row) => String(row.year) === yearFilter);
+  }, [allRows, yearFilter]);
 
   const currentRows = useMemo(() => {
-    return historyRows.filter((row: any) => {
-      return String(row.year) === currentYear;
-    });
-  }, [historyRows, currentYear]);
+    return allRows.filter((row) => String(row.year) === currentYear);
+  }, [allRows, currentYear]);
 
-  const currentTotal = getTotal(currentRows);
-  const historyTotal = getTotal(filteredHistoryRows);
+  const historyRows = filteredRows;
+
+  const groupedHistoryRows = useMemo(() => {
+    const groups: Record<string, any[]> = {};
+
+    for (const row of historyRows) {
+      const year = String(row.year || "未知年份");
+      if (!groups[year]) groups[year] = [];
+      groups[year].push(row);
+    }
+
+    return Object.entries(groups)
+      .sort(([a], [b]) => Number(b) - Number(a))
+      .map(([year, rows]) => ({
+        year,
+        rows,
+        total: pitcher ? getPitcherTotalRow(rows, year) : getHitterTotalRow(rows, year),
+      }));
+  }, [historyRows, pitcher]);
 
   return (
-    <div className="mt-6 rounded-2xl border border-slate-700 bg-slate-900 overflow-hidden">
+    <div className="mt-6 overflow-hidden rounded-2xl border border-slate-700 bg-slate-900">
       <div className="border-b border-slate-800 p-3 md:hidden">
         <select
           value={activeTab}
@@ -359,23 +447,19 @@ export default function PlayerStatsTabs({
         </select>
       </div>
 
-      <div className="hidden md:grid md:grid-cols-5 border-b border-slate-800 text-sm">
+      <div className="hidden border-b border-slate-800 text-sm md:grid md:grid-cols-5">
         <TabButton active={activeTab === "current"} onClick={() => setActiveTab("current")}>
           今年成績
         </TabButton>
-
         <TabButton active={activeTab === "history"} onClick={() => setActiveTab("history")}>
           歷年成績
         </TabButton>
-
         <TabButton active={activeTab === "games"} onClick={() => setActiveTab("games")}>
           逐場紀錄
         </TabButton>
-
         <TabButton active={activeTab === "events"} onClick={() => setActiveTab("events")}>
           球員狀態總覽
         </TabButton>
-
         <TabButton active={activeTab === "scouting"} onClick={() => setActiveTab("scouting")}>
           球探評分
         </TabButton>
@@ -384,23 +468,11 @@ export default function PlayerStatsTabs({
       <div className="p-5">
         {activeTab === "current" || activeTab === "history" ? (
           <div className="mb-4 flex flex-wrap gap-3">
-            <select
-              value={levelFilter}
-              onChange={(e) => setLevelFilter(e.target.value)}
-              className="rounded-xl bg-slate-800 border border-slate-700 px-3 py-2 text-white"
-            >
-              {levelOptions.map((level) => (
-                <option key={level} value={level}>
-                  {level}
-                </option>
-              ))}
-            </select>
-
             {activeTab === "history" ? (
               <select
                 value={yearFilter}
                 onChange={(e) => setYearFilter(e.target.value)}
-                className="rounded-xl bg-slate-800 border border-slate-700 px-3 py-2 text-white"
+                className="rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-white"
               >
                 {yearOptions.map((year) => (
                   <option key={year} value={year}>
@@ -409,23 +481,45 @@ export default function PlayerStatsTabs({
                 ))}
               </select>
             ) : null}
+
+            <select
+              value={levelFilter}
+              onChange={(e) => setLevelFilter(e.target.value)}
+              className="rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-white"
+            >
+              {levelOptions.map((level) => (
+                <option key={level} value={level}>
+                  {level}
+                </option>
+              ))}
+            </select>
           </div>
         ) : null}
 
         <div className="overflow-x-auto">
           {activeTab === "current" ? (
             pitcher ? (
-              <PitcherTable rows={currentRows} total={currentTotal} />
+              <PitcherTable rows={currentRows} totalRow={getPitcherTotalRow(currentRows)} />
             ) : (
-              <HitterTable rows={currentRows} total={currentTotal} />
+              <HitterTable rows={currentRows} totalRow={getHitterTotalRow(currentRows)} />
             )
           ) : null}
 
           {activeTab === "history" ? (
             pitcher ? (
-              <PitcherTable rows={filteredHistoryRows} total={historyTotal} />
+              <PitcherHistoryTable
+                groups={groupedHistoryRows}
+                expandedYears={expandedYears}
+                toggleYear={toggleYear}
+                allTotalRow={getPitcherTotalRow(historyRows)}
+              />
             ) : (
-              <HitterTable rows={filteredHistoryRows} total={historyTotal} />
+              <HitterHistoryTable
+                groups={groupedHistoryRows}
+                expandedYears={expandedYears}
+                toggleYear={toggleYear}
+                allTotalRow={getHitterTotalRow(historyRows)}
+              />
             )
           ) : null}
 
@@ -457,10 +551,8 @@ function TabButton({
     <button
       type="button"
       onClick={onClick}
-      className={`w-full px-5 py-3 text-center whitespace-nowrap ${
-        active
-          ? "bg-slate-800 text-white font-bold"
-          : "text-slate-400 hover:text-white"
+      className={`w-full whitespace-nowrap px-5 py-3 text-center ${
+        active ? "bg-slate-800 font-bold text-white" : "text-slate-400 hover:text-white"
       }`}
     >
       {children}
@@ -468,261 +560,353 @@ function TabButton({
   );
 }
 
-function HitterTable({ rows, total }: { rows: any[]; total: any }) {
+const HITTER_HEADERS = [
+  "Season",
+  "Team",
+  "Level",
+  "G",
+  "PA",
+  "AB",
+  "R",
+  "H",
+  "TB",
+  "2B",
+  "3B",
+  "HR",
+  "RBI",
+  "BB",
+  "IBB",
+  "HBP",
+  "SO",
+  "SB",
+  "CS",
+  "SF",
+  "AVG",
+  "OBP",
+  "SLG",
+  "OPS",
+  "GO/AO",
+  "K%",
+  "BB%",
+  "BABIP",
+];
+
+const PITCHER_HEADERS = [
+  "Season",
+  "Team",
+  "Level",
+  "W",
+  "L",
+  "ERA",
+  "G",
+  "GS",
+  "CG",
+  "SHO",
+  "HLD",
+  "SV",
+  "SVO",
+  "IP",
+  "H",
+  "R",
+  "ER",
+  "HR",
+  "NP",
+  "HBP",
+  "BB",
+  "IBB",
+  "SO",
+  "AVG",
+  "WHIP",
+  "GO/AO",
+  "K/9",
+  "BB/9",
+  "HR/9",
+  "H/9",
+  "K/BB",
+];
+
+function HitterTable({ rows, totalRow }: { rows: any[]; totalRow: any }) {
   return (
-    <table className="min-w-[1250px] w-full text-sm">
-      <thead className="bg-slate-800 text-slate-300">
-        <tr>
-          {[
-            "年度",
-            "球隊",
-            "層級",
-            "出賽",
-            "打數",
-            "打席",
-            "得分",
-            "安打",
-            "二安",
-            "三安",
-            "全壘打",
-            "打點",
-            "四壞",
-            "三振",
-            "盜壘",
-            "HBP",
-            "SF",
-            "AVG",
-            "OBP",
-            "SLG",
-            "OPS",
-            "ISO",
-            "BABIP",
-            "K%",
-            "BB%",
-          ].map((h) => (
-            <th key={h} className="p-3 text-left whitespace-nowrap">
-              {h}
-            </th>
-          ))}
-        </tr>
-      </thead>
-
+    <table className="w-full min-w-[1700px] text-sm">
+      <TableHead headers={HITTER_HEADERS} />
       <tbody>
-        {rows.map((row) => {
-          const avg = safeDivide(row.h, row.ab);
-          const obp = safeDivide(row.h + row.bb + row.hbp, row.pa);
-
-          const singles = row.h - row.doubles - row.triples - row.hr;
-          const tb = singles + row.doubles * 2 + row.triples * 3 + row.hr * 4;
-          const slg = safeDivide(tb, row.ab);
-          const ops = obp === null && slg === null ? null : (obp ?? 0) + (slg ?? 0);
-          const iso = slg === null || avg === null ? null : slg - avg;
-          const babip = safeDivide(row.h - row.hr, row.ab - row.k - row.hr + row.sf);
-          const kRate = safeDivide(row.k, row.pa);
-          const bbRate = safeDivide(row.bb, row.pa);
-
-          return (
-            <tr key={`${row.year}-${row.team}-${row.level}`} className="border-t border-slate-800">
-              <td className="p-3">{row.year}</td>
-              <td className="p-3">{row.team}</td>
-              <td className="p-3">{row.level}</td>
-              <td className="p-3">{row.games}</td>
-              <td className="p-3">{row.ab}</td>
-              <td className="p-3">{row.pa}</td>
-              <td className="p-3">{row.r}</td>
-              <td className="p-3">{row.h}</td>
-              <td className="p-3">{row.doubles}</td>
-              <td className="p-3">{row.triples}</td>
-              <td className="p-3">{row.hr}</td>
-              <td className="p-3">{row.rbi}</td>
-              <td className="p-3">{row.bb}</td>
-              <td className="p-3">{row.k}</td>
-              <td className="p-3">{row.sb}</td>
-              <td className="p-3">{row.hbp}</td>
-              <td className="p-3">{row.sf}</td>
-              <td className="p-3">{formatRate(avg)}</td>
-              <td className="p-3">{formatRate(obp)}</td>
-              <td className="p-3">{formatRate(slg)}</td>
-              <td className="p-3">{formatRate(ops)}</td>
-              <td className="p-3">{formatRate(iso)}</td>
-              <td className="p-3">{formatRate(babip)}</td>
-              <td className="p-3">{formatRate(kRate)}</td>
-              <td className="p-3">{formatRate(bbRate)}</td>
-            </tr>
-          );
-        })}
-
-        <HitterTotalRow rows={rows} total={total} />
+        {rows.map((row, index) => (
+          <HitterRow key={`${row.year}-${row.team}-${row.level}-${index}`} row={row} />
+        ))}
+        <HitterRow row={totalRow} bold />
       </tbody>
     </table>
   );
 }
 
-function HitterTotalRow({ rows, total }: { rows: any[]; total: any }) {
-  const avg = safeDivide(total.h, total.ab);
-  const obp = safeDivide(total.h + total.bb + total.hbp, total.pa);
+function HitterHistoryTable({
+  groups,
+  expandedYears,
+  toggleYear,
+  allTotalRow,
+}: {
+  groups: any[];
+  expandedYears: string[];
+  toggleYear: (year: string) => void;
+  allTotalRow: any;
+}) {
+  return (
+    <table className="w-full min-w-[1700px] text-sm">
+      <TableHead headers={HITTER_HEADERS} />
+      <tbody>
+        {groups.map((group) => {
+          const expanded = expandedYears.includes(group.year);
 
-  const singles = total.h - total.doubles - total.triples - total.hr;
-  const tb = singles + total.doubles * 2 + total.triples * 3 + total.hr * 4;
-  const slg = safeDivide(tb, total.ab);
-  const ops = obp === null && slg === null ? null : (obp ?? 0) + (slg ?? 0);
-  const iso = slg === null || avg === null ? null : slg - avg;
-  const babip = safeDivide(total.h - total.hr, total.ab - total.k - total.hr + total.sf);
-  const kRate = safeDivide(total.k, total.pa);
-  const bbRate = safeDivide(total.bb, total.pa);
+          return (
+            <React.Fragment key={group.year}>
+              <HitterRow
+                row={group.total}
+                bold
+                clickable
+                prefix={expanded ? "▼" : "▶"}
+                onClick={() => toggleYear(group.year)}
+              />
+
+              {expanded
+                ? group.rows.map((row: any, index: number) => (
+                    <HitterRow
+                      key={`${row.year}-${row.team}-${row.level}-${index}`}
+                      row={row}
+                      indent
+                    />
+                  ))
+                : null}
+            </React.Fragment>
+          );
+        })}
+
+        <HitterRow row={{ ...allTotalRow, year: "生涯" }} bold />
+      </tbody>
+    </table>
+  );
+}
+
+function HitterRow({
+  row,
+  bold = false,
+  clickable = false,
+  prefix = "",
+  indent = false,
+  onClick,
+}: {
+  row: any;
+  bold?: boolean;
+  clickable?: boolean;
+  prefix?: string;
+  indent?: boolean;
+  onClick?: () => void;
+}) {
+  const className = [
+    "border-t border-slate-800",
+    bold ? "bg-slate-800/50 font-bold" : "",
+    clickable ? "cursor-pointer hover:bg-slate-800" : "",
+  ].join(" ");
+
+  const stickyBg = bold ? "bg-slate-800" : "bg-slate-900";
 
   return (
-    <tr className="border-t border-slate-700 bg-slate-800/50 font-bold">
-      <td className="p-3">{rows[0]?.year || new Date().getFullYear()}</td>
-      <td className="p-3">合計</td>
-      <td className="p-3">-</td>
-      <td className="p-3">{total.games}</td>
-      <td className="p-3">{total.ab}</td>
-      <td className="p-3">{total.pa}</td>
-      <td className="p-3">{total.r}</td>
-      <td className="p-3">{total.h}</td>
-      <td className="p-3">{total.doubles}</td>
-      <td className="p-3">{total.triples}</td>
-      <td className="p-3">{total.hr}</td>
-      <td className="p-3">{total.rbi}</td>
-      <td className="p-3">{total.bb}</td>
-      <td className="p-3">{total.k}</td>
-      <td className="p-3">{total.sb}</td>
-      <td className="p-3">{total.hbp}</td>
-      <td className="p-3">{total.sf}</td>
-      <td className="p-3">{formatRate(avg)}</td>
-      <td className="p-3">{formatRate(obp)}</td>
-      <td className="p-3">{formatRate(slg)}</td>
-      <td className="p-3">{formatRate(ops)}</td>
-      <td className="p-3">{formatRate(iso)}</td>
-      <td className="p-3">{formatRate(babip)}</td>
-      <td className="p-3">{formatRate(kRate)}</td>
-      <td className="p-3">{formatRate(bbRate)}</td>
+    <tr className={className} onClick={onClick}>
+      <td className={`sticky left-0 z-20 w-[90px] min-w-[90px] ${stickyBg} p-3 ${indent ? "pl-8" : ""}`}>
+        {prefix ? `${prefix} ` : ""}
+        {row.year}
+      </td>
+      <td className={`sticky left-[90px] z-20 w-[120px] min-w-[120px] ${stickyBg} p-3`}>
+        {displayTeamName(row.team)}
+      </td>
+      <td className={`sticky left-[210px] z-20 w-[90px] min-w-[90px] ${stickyBg} p-3`}>
+        {displayValue(row.level)}
+      </td>
+      <td className="p-3">{row.games}</td>
+      <td className="p-3">{row.pa}</td>
+      <td className="p-3">{row.ab}</td>
+      <td className="p-3">{row.r}</td>
+      <td className="p-3">{row.h}</td>
+      <td className="p-3">{row.tb}</td>
+      <td className="p-3">{row.doubles}</td>
+      <td className="p-3">{row.triples}</td>
+      <td className="p-3">{row.hr}</td>
+      <td className="p-3">{row.rbi}</td>
+      <td className="p-3">{row.bb}</td>
+      <td className="p-3">{row.ibb}</td>
+      <td className="p-3">{row.hbp}</td>
+      <td className="p-3">{row.k}</td>
+      <td className="p-3">{row.sb}</td>
+      <td className="p-3">{row.cs}</td>
+      <td className="p-3">{row.sf}</td>
+      <td className="p-3">{formatRate(row.avg)}</td>
+      <td className="p-3">{formatRate(row.obp)}</td>
+      <td className="p-3">{formatRate(row.slg)}</td>
+      <td className="p-3">{formatRate(row.ops)}</td>
+      <td className="p-3">{displayValue(row.goAo)}</td>
+      <td className="p-3">{formatPercent(row.kRate)}</td>
+      <td className="p-3">{formatPercent(row.bbRate)}</td>
+      <td className="p-3">{formatRate(row.babip)}</td>
     </tr>
   );
 }
 
-function PitcherTable({ rows, total }: { rows: any[]; total: any }) {
+function PitcherTable({ rows, totalRow }: { rows: any[]; totalRow: any }) {
   return (
-    <table className="min-w-[1150px] w-full text-sm">
-      <thead className="bg-slate-800 text-slate-300">
-        <tr>
-          {[
-            "年度",
-            "球隊",
-            "層級",
-            "出賽",
-            "勝",
-            "敗",
-            "HLD",
-            "SV",
-            "局數",
-            "責失",
-            "被安打",
-            "四壞",
-            "三振",
-            "BF",
-            "投球數",
-            "ERA",
-            "WHIP",
-            "K/9",
-            "BB/9",
-            "K/BB",
-            "K%",
-            "BB%",
-            "BABIP",
-          ].map((h) => (
-            <th key={h} className="p-3 text-left whitespace-nowrap">
-              {h}
-            </th>
-          ))}
-        </tr>
-      </thead>
-
+    <table className="w-full min-w-[1850px] text-sm">
+      <TableHead headers={PITCHER_HEADERS} />
       <tbody>
-        {rows.map((row) => {
-          const ip = row.ipOuts / 3;
-          const era = safeDivide(row.er * 9, ip);
-          const whip = safeDivide(row.bb + row.h, ip);
-          const k9 = safeDivide(row.k * 9, ip);
-          const bb9 = safeDivide(row.bb * 9, ip);
-          const kbb = safeDivide(row.k, row.bb);
-          const kRate = safeDivide(row.k, row.bf);
-          const bbRate = safeDivide(row.bb, row.bf);
-          const babip = safeDivide(row.h - row.hr, row.bf - row.k - row.bb - row.hbp - row.hr);
-
-          return (
-            <tr key={`${row.year}-${row.team}-${row.level}`} className="border-t border-slate-800">
-              <td className="p-3">{row.year}</td>
-              <td className="p-3">{row.team}</td>
-              <td className="p-3">{row.level}</td>
-              <td className="p-3">{row.games}</td>
-              <td className="p-3">{row.win}</td>
-              <td className="p-3">{row.loss}</td>
-              <td className="p-3">{row.hold}</td>
-              <td className="p-3">{row.save}</td>
-              <td className="p-3">{outsToIp(row.ipOuts)}</td>
-              <td className="p-3">{row.er}</td>
-              <td className="p-3">{row.h}</td>
-              <td className="p-3">{row.bb}</td>
-              <td className="p-3">{row.k}</td>
-              <td className="p-3">{row.bf}</td>
-              <td className="p-3">{row.pitchCount}</td>
-              <td className="p-3">{formatDecimal(era)}</td>
-              <td className="p-3">{formatDecimal(whip)}</td>
-              <td className="p-3">{formatDecimal(k9)}</td>
-              <td className="p-3">{formatDecimal(bb9)}</td>
-              <td className="p-3">{formatDecimal(kbb)}</td>
-              <td className="p-3">{formatRate(kRate)}</td>
-              <td className="p-3">{formatRate(bbRate)}</td>
-              <td className="p-3">{formatRate(babip)}</td>
-            </tr>
-          );
-        })}
-
-        <PitcherTotalRow rows={rows} total={total} />
+        {rows.map((row, index) => (
+          <PitcherRow key={`${row.year}-${row.team}-${row.level}-${index}`} row={row} />
+        ))}
+        <PitcherRow row={totalRow} bold />
       </tbody>
     </table>
   );
 }
 
-function PitcherTotalRow({ rows, total }: { rows: any[]; total: any }) {
-  const ip = total.ipOuts / 3;
-  const era = safeDivide(total.er * 9, ip);
-  const whip = safeDivide(total.bb + total.h, ip);
-  const k9 = safeDivide(total.k * 9, ip);
-  const bb9 = safeDivide(total.bb * 9, ip);
-  const kbb = safeDivide(total.k, total.bb);
-  const kRate = safeDivide(total.k, total.bf);
-  const bbRate = safeDivide(total.bb, total.bf);
-  const babip = safeDivide(total.h - total.hr, total.bf - total.k - total.bb - total.hbp - total.hr);
+function PitcherHistoryTable({
+  groups,
+  expandedYears,
+  toggleYear,
+  allTotalRow,
+}: {
+  groups: any[];
+  expandedYears: string[];
+  toggleYear: (year: string) => void;
+  allTotalRow: any;
+}) {
+  return (
+    <table className="w-full min-w-[1850px] text-sm">
+      <TableHead headers={PITCHER_HEADERS} />
+      <tbody>
+        {groups.map((group) => {
+          const expanded = expandedYears.includes(group.year);
+
+          return (
+            <React.Fragment key={group.year}>
+              <PitcherRow
+                row={group.total}
+                bold
+                clickable
+                prefix={expanded ? "▼" : "▶"}
+                onClick={() => toggleYear(group.year)}
+              />
+
+              {expanded
+                ? group.rows.map((row: any, index: number) => (
+                    <PitcherRow
+                      key={`${row.year}-${row.team}-${row.level}-${index}`}
+                      row={row}
+                      indent
+                    />
+                  ))
+                : null}
+            </React.Fragment>
+          );
+        })}
+
+        <PitcherRow row={{ ...allTotalRow, year: "生涯" }} bold />
+      </tbody>
+    </table>
+  );
+}
+
+function PitcherRow({
+  row,
+  bold = false,
+  clickable = false,
+  prefix = "",
+  indent = false,
+  onClick,
+}: {
+  row: any;
+  bold?: boolean;
+  clickable?: boolean;
+  prefix?: string;
+  indent?: boolean;
+  onClick?: () => void;
+}) {
+  const ip = toNumber(row.ipOuts) / 3;
+  const k9 = row.k9 ?? safeDivide(row.k * 9, ip);
+  const bb9 = row.bb9 ?? safeDivide(row.bb * 9, ip);
+  const hr9 = row.hr9 ?? safeDivide(row.hr * 9, ip);
+  const h9 = row.h9 ?? safeDivide(row.h * 9, ip);
+  const kbb = row.kbb ?? safeDivide(row.k, row.bb);
+
+  const className = [
+    "border-t border-slate-800",
+    bold ? "bg-slate-800/50 font-bold" : "",
+    clickable ? "cursor-pointer hover:bg-slate-800" : "",
+  ].join(" ");
+
+  const stickyBg = bold ? "bg-slate-800" : "bg-slate-900";
 
   return (
-    <tr className="border-t border-slate-700 bg-slate-800/50 font-bold">
-      <td className="p-3">{rows[0]?.year || new Date().getFullYear()}</td>
-      <td className="p-3">合計</td>
-      <td className="p-3">-</td>
-      <td className="p-3">{total.games}</td>
-      <td className="p-3">{total.win}</td>
-      <td className="p-3">{total.loss}</td>
-      <td className="p-3">{total.hold}</td>
-      <td className="p-3">{total.save}</td>
-      <td className="p-3">{outsToIp(total.ipOuts)}</td>
-      <td className="p-3">{total.er}</td>
-      <td className="p-3">{total.h}</td>
-      <td className="p-3">{total.bb}</td>
-      <td className="p-3">{total.k}</td>
-      <td className="p-3">{total.bf}</td>
-      <td className="p-3">{total.pitchCount}</td>
-      <td className="p-3">{formatDecimal(era)}</td>
-      <td className="p-3">{formatDecimal(whip)}</td>
+    <tr className={className} onClick={onClick}>
+      <td className={`sticky left-0 z-20 w-[90px] min-w-[90px] ${stickyBg} p-3 ${indent ? "pl-8" : ""}`}>
+        {prefix ? `${prefix} ` : ""}
+        {row.year}
+      </td>
+      <td className={`sticky left-[90px] z-20 w-[120px] min-w-[120px] ${stickyBg} p-3`}>
+        {displayTeamName(row.team)}
+      </td>
+      <td className={`sticky left-[210px] z-20 w-[90px] min-w-[90px] ${stickyBg} p-3`}>
+        {displayValue(row.level)}
+      </td>
+      <td className="p-3">{row.win}</td>
+      <td className="p-3">{row.loss}</td>
+      <td className="p-3">{formatDecimal(row.era)}</td>
+      <td className="p-3">{row.games}</td>
+      <td className="p-3">{row.gs}</td>
+      <td className="p-3">{row.cg}</td>
+      <td className="p-3">{row.sho}</td>
+      <td className="p-3">{row.hold}</td>
+      <td className="p-3">{row.save}</td>
+      <td className="p-3">{row.svo}</td>
+      <td className="p-3">{row.ipDisplay || outsToIp(row.ipOuts)}</td>
+      <td className="p-3">{row.h}</td>
+      <td className="p-3">{row.r}</td>
+      <td className="p-3">{row.er}</td>
+      <td className="p-3">{row.hr}</td>
+      <td className="p-3">{row.pitchCount}</td>
+      <td className="p-3">{row.hbp}</td>
+      <td className="p-3">{row.bb}</td>
+      <td className="p-3">{row.ibb}</td>
+      <td className="p-3">{row.k}</td>
+      <td className="p-3">{displayValue(row.avgAgainst)}</td>
+      <td className="p-3">{formatDecimal(row.whip)}</td>
+      <td className="p-3">{displayValue(row.goAo)}</td>
       <td className="p-3">{formatDecimal(k9)}</td>
       <td className="p-3">{formatDecimal(bb9)}</td>
+      <td className="p-3">{formatDecimal(hr9)}</td>
+      <td className="p-3">{formatDecimal(h9)}</td>
       <td className="p-3">{formatDecimal(kbb)}</td>
-      <td className="p-3">{formatRate(kRate)}</td>
-      <td className="p-3">{formatRate(bbRate)}</td>
-      <td className="p-3">{formatRate(babip)}</td>
     </tr>
+  );
+}
+
+function TableHead({ headers }: { headers: string[] }) {
+  return (
+    <thead className="bg-slate-800 text-slate-300">
+      <tr>
+        {headers.map((h) => {
+          const stickyClass =
+            h === "Season"
+              ? "sticky left-0 z-30 w-[90px] min-w-[90px] bg-slate-800"
+              : h === "Team"
+              ? "sticky left-[90px] z-30 w-[120px] min-w-[120px] bg-slate-800"
+              : h === "Level"
+              ? "sticky left-[210px] z-30 w-[90px] min-w-[90px] bg-slate-800"
+              : "";
+
+          return (
+            <th key={h} className={`whitespace-nowrap p-3 text-left ${stickyClass}`}>
+              {h}
+            </th>
+          );
+        })}
+      </tr>
+    </thead>
   );
 }
 
@@ -801,8 +985,22 @@ function GameList({
     <table className="w-full min-w-[1050px] text-sm">
       <thead className="bg-slate-800 text-slate-300">
         <tr>
-          {["日期", "賽事", "球隊", "層級", "對手", "局數", "投球數", "被安打", "全壘打", "三振", "四壞", "ERA", "WHIP"].map((h) => (
-            <th key={h} className="p-3 text-left whitespace-nowrap">
+          {[
+            "日期",
+            "賽事",
+            "球隊",
+            "層級",
+            "對手",
+            "局數",
+            "投球數",
+            "被安打",
+            "全壘打",
+            "三振",
+            "四壞",
+            "ERA",
+            "WHIP",
+          ].map((h) => (
+            <th key={h} className="whitespace-nowrap p-3 text-left">
               {h}
             </th>
           ))}
@@ -817,7 +1015,10 @@ function GameList({
           const s = getPitchingStats(report);
 
           return (
-            <tr key={report.id || `${report.report_date}-${report.result}`} className="border-t border-slate-800">
+            <tr
+              key={report.id || `${report.report_date}-${report.result}`}
+              className="border-t border-slate-800"
+            >
               <td className="p-3">{displayValue(report.report_date)}</td>
               <td className="p-3">{displayGameType(report.game_type)}</td>
               <td className="p-3">
@@ -853,6 +1054,7 @@ function GameList({
     </table>
   );
 }
+
 function EventList({ events }: { events: any[] }) {
   if (!events.length) {
     return <div className="p-5 text-slate-400">目前沒有狀態紀錄</div>;
@@ -884,9 +1086,7 @@ function EventList({ events }: { events: any[] }) {
                   {displayValue(event.event_date)}
                 </div>
 
-                <div className="font-bold text-white">
-                  {getEventContent(event)}
-                </div>
+                <div className="font-bold text-white">{getEventContent(event)}</div>
               </div>
             ))}
           </details>

@@ -6,22 +6,38 @@ type Props = {
 
 function gradeItems(report: PlayerScoutingReport) {
   return [
-    ["Hit", report.hit],
-    ["Power", report.power],
-    ["Run", report.run],
-    ["Arm", report.arm],
-    ["Field", report.field],
-    ["Fastball", report.fastball],
-    ["Breaking", report.breaking],
-    ["Changeup", report.changeup],
-    ["Slider", report.slider],
-    ["Curveball", report.curveball],
-    ["Command", report.command],
-    ["Control", report.control],
-    ["Stuff", report.stuff],
-    ["Overall", report.overall],
-    ["FV", report.fv],
+    ["ETA", report.eta, null],
+    
+    ["Hit", report.hit, report.hit_future],
+    ["Power", report.power, report.power_future],
+    ["Game Power", report.game_power, report.game_power_future],
+    ["Raw Power", report.raw_power, report.raw_power_future],
+    ["Run", report.run, report.run_future],
+    ["Arm", report.arm, report.arm_future],
+    ["Field", report.field, report.field_future],
+
+    ["Fastball", report.fastball, report.fastball_future],
+    ["Breaking", report.breaking, report.breaking_future],
+    ["Changeup", report.changeup, report.changeup_future],
+    ["Slider", report.slider, report.slider_future],
+    ["Curveball", report.curveball, report.curveball_future],
+    ["Cutter", report.cutter, report.cutter_future],
+    ["Splitter", report.splitter, report.splitter_future],
+    ["Command", report.command, report.command_future],
+    ["Control", report.control, report.control_future],
+    ["Stuff", report.stuff, report.stuff_future],
+
+    ["Overall", report.overall, null],
+    ["FV", report.fv, null],
   ].filter(([, value]) => value !== null && value !== undefined);
+}
+
+function formatGrade(current: unknown, future: unknown) {
+  if (future !== null && future !== undefined && future !== "") {
+    return `${current} / ${future}`;
+  }
+
+  return String(current ?? "-");
 }
 
 export default function PlayerScoutingReports({ reports }: Props) {
@@ -50,24 +66,33 @@ export default function PlayerScoutingReports({ reports }: Props) {
                   {report.report_year}
                 </span>
               ) : null}
+
             </div>
 
             <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
-              {gradeItems(report).map(([label, value]) => (
+              {gradeItems(report).map(([label, value, future]) => (
                 <div
                   key={String(label)}
                   className="rounded-lg bg-slate-900 px-3 py-2"
                 >
                   <div className="text-xs text-slate-400">{label}</div>
-                  <div className="text-lg font-black text-white">{value}</div>
+                  <div className="text-lg font-black text-white">
+                    {formatGrade(value, future)}
+                  </div>
                 </div>
               ))}
             </div>
 
             {report.summary ? (
-              <p className="mt-3 text-sm leading-6 text-slate-300">
-                {report.summary}
-              </p>
+              <div className="mt-3 space-y-2">
+                <div className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                  球探摘要
+                </div>
+
+                <p className="text-sm leading-7 text-slate-300 whitespace-pre-line">
+                  {report.summary}
+                </p>
+              </div>
             ) : null}
 
             {report.source_url ? (

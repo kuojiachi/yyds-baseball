@@ -7,7 +7,11 @@ import { normalizeLevel } from "@/src/utils/playerEvents";
 import PlayerPageHeader from "./_components/PlayerPageHeader";
 import PlayerStatsTabs from "./_components/PlayerStatsTabs";
 import { getPlayerScoutingReports } from "@/src/lib/playerScoutingReports";
-import PlayerScoutingReports from "./_components/PlayerScoutingReports";
+import {
+  getPlayerCurrentSeasonStats,
+  getPlayerSeasonStats,
+} from "@/src/lib/seasonStats";
+import { getPlayerSeasonStatsSummary } from "@/src/lib/seasonStatsSummary";
 
 type PlayerPageProps = {
   params: Promise<Record<string, string>>;
@@ -104,6 +108,9 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
   }
 
   const scoutingReports = await getPlayerScoutingReports(player.id);
+  const currentSeasonStats = await getPlayerCurrentSeasonStats(player.id);
+  const seasonStats = await getPlayerSeasonStats(player.id);
+  const seasonStatsSummary = await getPlayerSeasonStatsSummary(player.id);
 
   const normalizedPlayer = {
     ...player,
@@ -164,8 +171,10 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
           playerReports={normalizedPlayerReports}
           playerEvents={playerEvents}
           scoutingReports={scoutingReports}
+          currentSeasonStats={currentSeasonStats}
+          seasonStats={seasonStats}
+          seasonStatsSummary={seasonStatsSummary}
         />
-
       </section>
     </main>
   );

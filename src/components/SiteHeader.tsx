@@ -119,7 +119,7 @@ function SearchBox({ playerNameOptions }: { playerNameOptions: any[] }) {
           />
 
           {isFocused && matchedOptions.length > 0 ? (
-            <div className="absolute z-[9999] left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-xl border border-slate-700 bg-slate-900 shadow-xl shadow-black/40">
+            <div className="absolute z-[9999] left-0 right-0 top-full mt-2 overflow-hidden rounded-xl border border-slate-700 bg-slate-900 shadow-xl shadow-black/40">
               {matchedOptions.map((p) => (
                 <button
                   key={p.name_zh}

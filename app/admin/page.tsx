@@ -63,6 +63,9 @@ export default async function AdminPage() {
               <a href="/admin/daily-reports/new" className="rounded-xl bg-slate-800 px-4 py-2 hover:bg-slate-700">
                 新增球員出賽紀錄
               </a>
+              <a href="/admin/season-stats" className="rounded-xl bg-slate-800 px-4 py-2 hover:bg-slate-700">
+                Season Stats 匯入
+              </a>
             </div>
           </div>
 
