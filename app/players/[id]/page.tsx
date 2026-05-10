@@ -173,7 +173,6 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
           scoutingReports={scoutingReports}
           currentSeasonStats={currentSeasonStats}
           seasonStats={seasonStats}
-          seasonStatsSummary={seasonStatsSummary}
         />
       </section>
     </main>
