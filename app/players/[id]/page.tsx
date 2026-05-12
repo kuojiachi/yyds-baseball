@@ -55,11 +55,16 @@ function hasRealGameReport(report: any): boolean {
 
   const hasNumberStats =
     toNumber(report.ab) > 0 ||
+    toNumber(report.pa) > 0 ||
     toNumber(report.h) > 0 ||
     toNumber(report.rbi) > 0 ||
+    toNumber(report.tb) > 0 ||
+    toNumber(report.hr) > 0 ||
+    toNumber(report.bb) > 0 ||
+    toNumber(report.k) > 0 ||
     toNumber(report.ip) > 0 ||
-    toNumber(report.innings) > 0 ||
-    toNumber(report.pitches) > 0;
+    toNumber(report.pitch_count) > 0 ||
+    normalizeText(report.np_s) !== "";
 
   return hasTextStats || hasParsedStats || hasNumberStats;
 }

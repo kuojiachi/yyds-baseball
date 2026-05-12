@@ -37,6 +37,11 @@ function normalizeText(value: unknown): string {
   return String(value ?? "").trim();
 }
 
+function displayValue(value: unknown): string {
+  const valueText = normalizeText(value);
+  return valueText || "-";
+}
+
 function normalizeSearchText(value: unknown): string {
   return normalizeText(value).toLowerCase();
 }
@@ -335,6 +340,293 @@ function CheckboxGroup({
   );
 }
 
+
+const PITCHER_COLUMNS = [
+  "Date",
+  "Team",
+  "OPP",
+  "W",
+  "L",
+  "ERA",
+  "G",
+  "GS",
+  "CG",
+  "SHO",
+  "SV",
+  "SVO",
+  "IP",
+  "H",
+  "R",
+  "ER",
+  "HR",
+  "HB",
+  "BB",
+  "IBB",
+  "SO",
+  "NP-S",
+  "AVG",
+  "WHIP",
+];
+
+const HITTER_COLUMNS = [
+  "Date",
+  "Team",
+  "OPP",
+  "AB",
+  "R",
+  "H",
+  "TB",
+  "2B",
+  "3B",
+  "HR",
+  "RBI",
+  "BB",
+  "IBB",
+  "SO",
+  "SB",
+  "CS",
+  "AVG",
+  "OBP",
+  "SLG",
+  "HBP",
+  "SF",
+];
+
+function getDailyTeam(report: TodayReport): string {
+  return (
+    normalizeText(
+      report.team_name ||
+        report.team ||
+        report.players?.team_name ||
+        report.players?.teams?.name_zh ||
+        report.players?.teams?.name_en
+    ) || "-"
+  );
+}
+
+function getNpS(report: TodayReport): string {
+  const explicit = normalizeText(report.np_s || report.np_strikes || report.np_s_display);
+  if (explicit) return explicit;
+
+  const pitches = normalizeText(report.pitch_count || report.np);
+  const strikes = normalizeText(report.strikes || report.s);
+  if (pitches && strikes) return `${pitches}-${strikes}`;
+
+  return pitches || "-";
+}
+
+function getHitterValue(report: TodayReport, column: string): string | number {
+  const h = toNumber(report.h);
+  const doubles = toNumber(report.doubles ?? report.double ?? report["2b"]);
+  const triples = toNumber(report.triples ?? report.triple ?? report["3b"]);
+  const hr = toNumber(report.hr);
+
+  const tb =
+    hasValue(report.tb)
+      ? toNumber(report.tb)
+      : h - doubles - triples - hr + doubles * 2 + triples * 3 + hr * 4;
+
+  const ab = toNumber(report.ab);
+  const bb = toNumber(report.bb);
+  const hbp = toNumber(report.hbp ?? report.hb);
+  const sf = toNumber(report.sf);
+
+  const obp =
+    hasValue(report.obp)
+      ? Number(report.obp)
+      : safeDivide(h + bb + hbp, ab + bb + hbp + sf);
+
+  const slg =
+    hasValue(report.slg)
+      ? Number(report.slg)
+      : safeDivide(tb, ab);
+
+  switch (column) {
+    case "Date":
+      return formatDate(report.report_date);
+    case "Team":
+      return getDailyTeam(report);
+    case "OPP":
+      return normalizeText(report.opponent) || "-";
+    case "AB":
+      return ab;
+    case "R":
+      return toNumber(report.r);
+    case "H":
+      return h;
+    case "TB":
+      return tb;
+    case "2B":
+      return doubles;
+    case "3B":
+      return triples;
+    case "HR":
+      return hr;
+    case "RBI":
+      return toNumber(report.rbi);
+    case "BB":
+      return bb;
+    case "IBB":
+      return toNumber(report.ibb);
+    case "SO":
+      return toNumber(report.so ?? report.k);
+    case "SB":
+      return toNumber(report.sb);
+    case "CS":
+      return toNumber(report.cs);
+    case "AVG":
+      return hasValue(report.avg) ? displayValue(report.avg) : formatRate(safeDivide(h, ab));
+    case "OBP":
+      return hasValue(report.obp) ? displayValue(report.obp) : formatRate(obp);
+    case "SLG":
+      return hasValue(report.slg) ? displayValue(report.slg) : formatRate(slg);
+    case "HBP":
+      return hbp;
+    case "SF":
+      return sf;
+    default:
+      return "-";
+  }
+}
+
+function getPitcherValue(report: TodayReport, column: string): string | number {
+  const ipOuts = ipToOuts(report.ip);
+  const ip = ipOuts / 3;
+  const h = toNumber(report.h);
+  const bb = toNumber(report.bb);
+  const er = toNumber(report.er);
+
+  switch (column) {
+    case "Date":
+      return formatDate(report.report_date);
+    case "Team":
+      return getDailyTeam(report);
+    case "OPP":
+      return normalizeText(report.opponent) || "-";
+    case "W":
+      return toNumber(report.w || report.win);
+    case "L":
+      return toNumber(report.l || report.loss);
+    case "ERA":
+      return hasValue(report.era) ? displayValue(report.era) : formatDecimal(safeDivide(er * 9, ip));
+    case "G":
+      return toNumber(report.g || 1);
+    case "GS":
+      return toNumber(report.gs);
+    case "CG":
+      return toNumber(report.cg);
+    case "SHO":
+      return toNumber(report.sho);
+    case "SV":
+      return toNumber(report.sv || report.save);
+    case "SVO":
+      return toNumber(report.svo);
+    case "IP":
+      return displayValue(report.ip);
+    case "H":
+      return h;
+    case "R":
+      return toNumber(report.r);
+    case "ER":
+      return er;
+    case "HR":
+      return toNumber(report.hr);
+    case "HB":
+      return toNumber(report.hb || report.hbp);
+    case "BB":
+      return bb;
+    case "IBB":
+      return toNumber(report.ibb);
+    case "SO":
+      return toNumber(report.so ?? report.k);
+    case "NP-S":
+      return getNpS(report);
+    case "AVG":
+      return displayValue(report.avg);
+    case "WHIP":
+      return hasValue(report.whip) ? displayValue(report.whip) : formatDecimal(safeDivide(h + bb, ip));
+    default:
+      return "-";
+  }
+}
+
+function isPitchingReport(report: TodayReport): boolean {
+  return isPitcher(report) || hasPitchingStats(report);
+}
+
+function isBattingReport(report: TodayReport): boolean {
+  return isHitter(report) || hasBattingStats(report);
+}
+
+function DetailedStatsTable({
+  title,
+  reports,
+  columns,
+  getValue,
+}: {
+  title: string;
+  reports: TodayReport[];
+  columns: string[];
+  getValue: (report: TodayReport, column: string) => string | number;
+}) {
+  if (reports.length === 0) return null;
+
+  return (
+    <div className="border-t border-slate-800">
+      <div className="bg-slate-900 px-5 py-3 text-sm font-bold text-slate-300">
+        {title}
+      </div>
+
+      <div className="overflow-auto overscroll-contain touch-pan-x">
+        <table className="w-full min-w-[1700px] border-separate border-spacing-0 text-sm whitespace-nowrap">
+          <thead className="sticky top-0 z-50 bg-slate-800 text-slate-300">
+            <tr>
+              <th className="sticky left-0 top-0 z-[70] w-[120px] min-w-[120px] bg-slate-800 p-3 text-left shadow-[4px_0_8px_rgba(0,0,0,0.35)] border-r border-slate-700">
+                球員
+              </th>
+              {columns.map((column) => (
+                <th key={column} className="bg-slate-800 p-3 text-left">
+                  {column}
+                </th>
+              ))}
+            </tr>
+          </thead>
+
+          <tbody>
+            {reports.map((report, index) => {
+              const name = getPlayerName(report) || "-";
+              const playerId = getPlayerId(report);
+              const safeId = playerId && playerId !== "undefined" ? playerId : null;
+
+              return (
+                <tr
+                  key={`${title}-${report.id || name}-${index}`}
+                  className="border-t border-slate-800 hover:bg-slate-800/60"
+                >
+                  <td className="sticky left-0 z-30 w-[120px] min-w-[120px] bg-slate-900 p-3 text-left font-bold shadow-[4px_0_8px_rgba(0,0,0,0.35)] border-r border-slate-800">
+                    <Link
+                      href={safeId ? `/players/${encodeURIComponent(safeId)}` : "#"}
+                      className="text-sky-300 hover:text-sky-200 hover:underline"
+                    >
+                      {name}
+                    </Link>
+                  </td>
+
+                  {columns.map((column) => (
+                    <td key={column} className="p-3 text-left">
+                      {getValue(report, column)}
+                    </td>
+                  ))}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 export default function TodayTable({ todayPlayers, allReports }: TodayTableProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -490,67 +782,29 @@ export default function TodayTable({ todayPlayers, allReports }: TodayTableProps
         </div>
 
         <div className="max-h-[calc(100vh-260px)] overflow-auto overscroll-contain touch-pan-x">
-          <table className="w-full min-w-[1150px] border-separate border-spacing-0 text-sm whitespace-nowrap">
-            <thead className="sticky top-0 z-50 bg-slate-800 text-slate-300">
-              <tr>
-                <th className="sticky left-0 top-0 z-[70] bg-slate-800 text-right p-3 shadow-[4px_0_8px_rgba(0,0,0,0.35)] border-r border-slate-700">
-                  球員
-                </th>
-                <th className="bg-slate-800 text-left p-3">日期</th>
-                <th className="bg-slate-800 text-left p-3">守位</th>
-                <th className="bg-slate-800 text-left p-3">聯盟</th>
-                <th className="bg-slate-800 text-left p-3">球隊</th>
-                <th className="bg-slate-800 text-left p-3">層級</th>
-                <th className="bg-slate-800 text-left p-3">結果</th>
-                <th className="bg-slate-800 text-left p-3">對手</th>
-                <th className="bg-slate-800 text-left p-3">成績</th>
-              </tr>
-            </thead>
+          {filteredTodayPlayers.length === 0 ? (
+            <div className="p-8 text-center text-slate-400">
+              找不到符合條件的出賽紀錄
+            </div>
+          ) : (
+            <>
+              <DetailedStatsTable
+                title="投手"
+                reports={filteredTodayPlayers.filter(isPitchingReport)}
+                columns={PITCHER_COLUMNS}
+                getValue={getPitcherValue}
+              />
 
-            <tbody>
-              {filteredTodayPlayers.length === 0 ? (
-                <tr>
-                  <td colSpan={9} className="p-8 text-center text-slate-400 border-t border-slate-800">
-                    找不到符合條件的出賽紀錄
-                  </td>
-                </tr>
-              ) : (
-                filteredTodayPlayers.map((report, index) => {
-                  const name = getPlayerName(report) || "-";
-                  const playerId = getPlayerId(report);
-                  const safeId = playerId && playerId !== "undefined" ? playerId : null;
-
-                  return (
-                    <tr key={`${report.id || name}-${index}`} className="border-t border-slate-800 hover:bg-slate-800/60">
-                      <td className="sticky left-0 z-30 bg-slate-900 p-3 text-right font-bold shadow-[4px_0_8px_rgba(0,0,0,0.35)] border-r border-slate-800">
-                        <Link
-                          href={safeId ? `/players/${encodeURIComponent(safeId)}` : "#"}
-                          className="text-sky-300 hover:text-sky-200 hover:underline"
-                        >
-                          {name}
-                        </Link>
-                      </td>
-
-                      <td className="p-3 text-left">{formatDate(report.report_date)}</td>
-                      <td className="p-3 text-left">{normalizeText(report.position) || "-"}</td>
-                      <td className="p-3 text-left">{getPlayerLeague(report) || "-"}</td>
-                      <td className="p-3 text-left">{getPlayerTeam(report) || "-"}</td>
-                      <td className="p-3 text-left">{getPlayerLevel(report) || "-"}</td>
-
-                      <td className="p-3 text-left">
-                        {normalizeText(report.result) || "-"}
-                      </td>
-
-                      <td className="p-3 text-left">{normalizeText(report.opponent) || "-"}</td>
-                      <td className="p-3 text-left whitespace-normal min-w-[360px]">
-                        {getStats(report, allReports)}
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+              <DetailedStatsTable
+                title="打者"
+                reports={filteredTodayPlayers.filter((report) => {
+                  return isBattingReport(report) && !isPitchingReport(report);
+                })}
+                columns={HITTER_COLUMNS}
+                getValue={getHitterValue}
+              />
+            </>
+          )}
         </div>
       </div>
     </>
