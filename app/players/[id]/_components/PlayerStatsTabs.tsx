@@ -18,14 +18,26 @@ function text(value: unknown) {
   return String(value ?? "").trim();
 }
 
+function isMissing(value: unknown) {
+  return value === null || value === undefined || String(value).trim() === "";
+}
+
 function toNumber(value: unknown) {
+  if (isMissing(value)) return null;
+
   const n = Number(value);
-  return Number.isFinite(n) ? n : 0;
+
+  return Number.isFinite(n) ? n : null;
+}
+
+function toNumberOrZero(value: unknown) {
+  const n = toNumber(value);
+  return n ?? 0;
 }
 
 function displayValue(value: unknown) {
-  const v = text(value);
-  return v || "-";
+  if (isMissing(value)) return "-";
+  return String(value);
 }
 
 function displayGameType(value: unknown) {
@@ -50,27 +62,92 @@ function isPitcher(player: any) {
   return position.includes("投") || position.includes("pitcher") || position === "p";
 }
 
-function safeDivide(top: number, bottom: number) {
-  if (!bottom) return null;
-  return top / bottom;
+function safeDivide(top: unknown, bottom: unknown) {
+  const nTop = toNumber(top);
+  const nBottom = toNumber(bottom);
+
+  if (nTop === null || nBottom === null || nBottom === 0) return null;
+
+  return nTop / nBottom;
+}
+
+function parseRateNumber(value: unknown) {
+  const raw = text(value).replace("%", "");
+  if (!raw || raw === "-" || raw === ".---") return null;
+
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return null;
+
+  return n;
+}
+
+function roundToInteger(value: unknown) {
+  const n = toNumber(value);
+  if (n === null) return null;
+
+  return Math.round(n);
+}
+
+function inferSacFlies(params: {
+  h: number | null;
+  bb: number | null;
+  hbp: number | null;
+  ab: number | null;
+  obp: unknown;
+}) {
+  const obp = parseRateNumber(params.obp);
+
+  if (
+    obp === null ||
+    obp <= 0 ||
+    params.h === null ||
+    params.bb === null ||
+    params.hbp === null ||
+    params.ab === null
+  ) {
+    return null;
+  }
+
+  const numerator = params.h + params.bb + params.hbp;
+  const denominatorWithoutSf = params.ab + params.bb + params.hbp;
+  const inferred = numerator / obp - denominatorWithoutSf;
+
+  if (!Number.isFinite(inferred) || inferred < -0.35) return null;
+
+  const rounded = Math.round(inferred);
+
+  return rounded >= 0 ? rounded : 0;
 }
 
 function formatRate(value: unknown) {
+  if (isMissing(value)) return "-";
+
   const n = Number(value);
   if (!Number.isFinite(n)) return "-";
+
   return n.toFixed(3).replace(/^0/, "");
 }
 
 function formatDecimal(value: unknown) {
+  if (isMissing(value)) return "-";
+
   const n = Number(value);
   if (!Number.isFinite(n)) return "-";
+
   return n.toFixed(2);
 }
 
 function formatPercent(value: unknown) {
+  if (value === null || value === undefined || String(value).trim() === "") {
+    return "-";
+  }
+
   const n = Number(value);
   if (!Number.isFinite(n)) return "-";
-  return `${n.toFixed(1)}%`;
+
+  const percent = Math.abs(n) <= 1 ? n * 100 : n;
+
+  return `${percent.toFixed(1)}%`;
 }
 
 function ipToOuts(ipValue: unknown) {
@@ -86,9 +163,17 @@ function ipToOuts(ipValue: unknown) {
   return whole * 3 + (decimal === 1 ? 1 : decimal === 2 ? 2 : 0);
 }
 
-function outsToIp(outs: number) {
-  const whole = Math.floor(outs / 3);
-  const rest = outs % 3;
+function ipToOutsNullable(ipValue: unknown) {
+  if (isMissing(ipValue)) return null;
+  return ipToOuts(ipValue);
+}
+
+function outsToIp(outs: unknown) {
+  const n = toNumber(outs);
+  if (n === null) return "-";
+
+  const whole = Math.floor(n / 3);
+  const rest = n % 3;
   return `${whole}.${rest}`;
 }
 
@@ -146,15 +231,54 @@ function normalizeSeasonRow(row: any) {
   const doubles = toNumber(row.doubles ?? row.double ?? row.two_b);
   const triples = toNumber(row.triples ?? row.triple ?? row.three_b);
   const hr = toNumber(row.hr);
-  const tb =
-    row.tb !== null && row.tb !== undefined && row.tb !== ""
-      ? toNumber(row.tb)
-      : h - doubles - triples - hr + doubles * 2 + triples * 3 + hr * 4;
+  const ab = toNumber(row.ab);
+  const bb = toNumber(row.bb);
+  const hbp = toNumber(row.hbp);
+  const k = toNumber(row.k ?? row.so);
+  const pa = toNumber(row.pa);
+  const officialObp = row.official_obp ?? row.obp;
+  const officialSlg = row.official_slg ?? row.slg;
 
-  const ipOuts =
-    row.ip_outs !== null && row.ip_outs !== undefined && row.ip_outs !== ""
-      ? toNumber(row.ip_outs)
-      : ipToOuts(row.ip_display || row.ip);
+  const inferredSf = inferSacFlies({
+    h,
+    bb,
+    hbp,
+    ab,
+    obp: officialObp,
+  });
+
+  const tb = !isMissing(row.tb)
+    ? toNumber(row.tb)
+    : h !== null && doubles !== null && triples !== null && hr !== null
+    ? h + doubles + triples * 2 + hr * 3
+    : ab !== null && parseRateNumber(officialSlg) !== null
+    ? roundToInteger((parseRateNumber(officialSlg) ?? 0) * ab)
+    : null;
+
+  const sf = !isMissing(row.sf) ? toNumber(row.sf) : inferredSf;
+  const calculatedAvg = safeDivide(h, ab);
+  const calculatedObp =
+    h !== null && bb !== null && hbp !== null && ab !== null && sf !== null
+      ? safeDivide(h + bb + hbp, ab + bb + hbp + sf)
+      : null;
+  const calculatedSlg = tb !== null && ab !== null ? safeDivide(tb, ab) : null;
+  const calculatedOps =
+    calculatedObp !== null && calculatedSlg !== null
+      ? calculatedObp + calculatedSlg
+      : null;
+  const calculatedBabip =
+    h !== null && hr !== null && ab !== null && k !== null && sf !== null
+      ? safeDivide(h - hr, ab - k - hr + sf)
+      : null;
+
+  const ipOuts = !isMissing(row.ip_outs)
+    ? toNumber(row.ip_outs)
+    : ipToOutsNullable(row.ip_display || row.ip);
+
+  const pitcherIp = ipOuts !== null ? ipOuts / 3 : null;
+  const pitcherH = toNumber(row.h);
+  const pitcherBb = toNumber(row.bb);
+  const pitcherEr = toNumber(row.er);
 
   return {
     raw: row,
@@ -165,7 +289,7 @@ function normalizeSeasonRow(row: any) {
 
     games: toNumber(row.g),
     pa: toNumber(row.pa),
-    ab: toNumber(row.ab),
+    ab,
     r: toNumber(row.r),
     h,
     tb,
@@ -173,26 +297,31 @@ function normalizeSeasonRow(row: any) {
     triples,
     hr,
     rbi: toNumber(row.rbi),
-    bb: toNumber(row.bb),
+    bb,
     ibb: toNumber(row.ibb),
-    hbp: toNumber(row.hbp),
-    k: toNumber(row.k ?? row.so),
+    hbp,
+    k,
     sb: toNumber(row.sb),
     cs: toNumber(row.cs),
-    sf: toNumber(row.sf),
+    sf,
 
-    avg: row.official_avg ?? row.avg,
-    obp: row.official_obp ?? row.obp,
-    slg: row.official_slg ?? row.slg,
-    ops: row.official_ops ?? row.ops,
+    avg: row.official_avg ?? row.avg ?? calculatedAvg,
+    obp: officialObp ?? calculatedObp,
+    slg: officialSlg ?? calculatedSlg,
+    ops: row.official_ops ?? row.ops ?? calculatedOps,
     goAo: row.go_ao,
-    kRate: row.official_k_rate ?? row.k_rate,
-    bbRate: row.official_bb_rate ?? row.bb_rate,
-    babip: row.official_babip ?? row.babip,
+    kRate: row.official_k_rate ?? row.k_rate ?? (k !== null && pa !== null ? safeDivide(k * 100, pa) : null),
+    bbRate: row.official_bb_rate ?? row.bb_rate ?? (bb !== null && pa !== null ? safeDivide(bb * 100, pa) : null),
+    babip: row.official_babip ?? row.babip ?? calculatedBabip,
 
     win: toNumber(row.win ?? row.w),
     loss: toNumber(row.loss ?? row.l),
-    era: row.official_era ?? row.era,
+    era:
+      row.official_era ??
+      row.era ??
+      (pitcherIp !== null && pitcherEr !== null
+        ? safeDivide(pitcherEr * 9, pitcherIp)
+        : null),
     gs: toNumber(row.gs),
     cg: toNumber(row.cg),
     sho: toNumber(row.sho),
@@ -201,129 +330,252 @@ function normalizeSeasonRow(row: any) {
     svo: toNumber(row.svo),
     ipOuts,
     ipDisplay: row.ip_display || row.ip,
+    bf: toNumber(row.bf ?? row.batters_faced ?? row.battersFaced),
+    runsAllowed: toNumber(row.r),
     er: toNumber(row.er),
     pitchCount: toNumber(row.pitch_count ?? row.np),
-    whip: row.official_whip ?? row.whip,
+    whip:
+      row.official_whip ??
+      row.whip ??
+      (pitcherIp !== null && pitcherH !== null && pitcherBb !== null
+        ? safeDivide(pitcherH + pitcherBb, pitcherIp)
+        : null),
     avgAgainst: row.official_avg_against ?? row.avg_against ?? row.avg,
   };
 }
 
 function getTotal(rows: any[]) {
-  return rows.reduce(
-    (sum, row) => {
-      sum.games += toNumber(row.games);
-      sum.pa += toNumber(row.pa);
-      sum.ab += toNumber(row.ab);
-      sum.r += toNumber(row.r);
-      sum.h += toNumber(row.h);
-      sum.tb += toNumber(row.tb);
-      sum.doubles += toNumber(row.doubles);
-      sum.triples += toNumber(row.triples);
-      sum.hr += toNumber(row.hr);
-      sum.rbi += toNumber(row.rbi);
-      sum.bb += toNumber(row.bb);
-      sum.ibb += toNumber(row.ibb);
-      sum.hbp += toNumber(row.hbp);
-      sum.k += toNumber(row.k);
-      sum.sb += toNumber(row.sb);
-      sum.cs += toNumber(row.cs);
-      sum.sf += toNumber(row.sf);
+  const keys = [
+    "games", "pa", "ab", "r", "h", "tb", "doubles", "triples", "hr",
+    "rbi", "bb", "ibb", "hbp", "k", "sb", "cs", "sf", "win", "loss",
+    "gs", "cg", "sho", "hold", "save", "svo", "ipOuts", "bf", "runsAllowed",
+    "er", "pitchCount",
+  ];
 
-      sum.win += toNumber(row.win);
-      sum.loss += toNumber(row.loss);
-      sum.gs += toNumber(row.gs);
-      sum.cg += toNumber(row.cg);
-      sum.sho += toNumber(row.sho);
-      sum.hold += toNumber(row.hold);
-      sum.save += toNumber(row.save);
-      sum.svo += toNumber(row.svo);
-      sum.ipOuts += toNumber(row.ipOuts);
-      sum.er += toNumber(row.er);
-      sum.pitchCount += toNumber(row.pitchCount);
+  const total: Record<string, number | null> = {};
 
-      return sum;
-    },
-    {
-      games: 0,
-      pa: 0,
-      ab: 0,
-      r: 0,
-      h: 0,
-      tb: 0,
-      doubles: 0,
-      triples: 0,
-      hr: 0,
-      rbi: 0,
-      bb: 0,
-      ibb: 0,
-      hbp: 0,
-      k: 0,
-      sb: 0,
-      cs: 0,
-      sf: 0,
-
-      win: 0,
-      loss: 0,
-      gs: 0,
-      cg: 0,
-      sho: 0,
-      hold: 0,
-      save: 0,
-      svo: 0,
-      ipOuts: 0,
-      er: 0,
-      pitchCount: 0,
+  for (const key of keys) {
+    if (!rows.length) {
+      total[key] = null;
+      continue;
     }
-  );
+
+    let sum = 0;
+    let complete = true;
+
+    for (const row of rows) {
+      const value = toNumber(row[key]);
+
+      if (value === null) {
+        complete = false;
+        break;
+      }
+
+      sum += value;
+    }
+
+    total[key] = complete ? sum : null;
+  }
+
+  return total;
 }
 
 function getHitterTotalRow(rows: any[], label = "合計") {
   const total = getTotal(rows);
 
-  const avg = safeDivide(total.h, total.ab);
-  const obp = safeDivide(
-    total.h + total.bb + total.hbp,
-    total.ab + total.bb + total.hbp + total.sf
-  );
-  const slg = safeDivide(total.tb, total.ab);
+  const hasAll = (key: string) =>
+    rows.every(
+      (row) =>
+        row[key] !== null &&
+        row[key] !== undefined &&
+        row[key] !== "-"
+    );
+
+  const h = toNumber(total.h);
+  const ab = toNumber(total.ab);
+  const bb = toNumber(total.bb);
+  const hbp = toNumber(total.hbp);
+  const sf = toNumber(total.sf);
+  const tb = toNumber(total.tb);
+  const hr = toNumber(total.hr);
+  const k = toNumber(total.k);
+  const pa = toNumber(total.pa);
+
+  const avg = hasAll("h") && hasAll("ab")
+    ? safeDivide(h, ab)
+    : null;
+
+  const obp = hasAll("h") && hasAll("bb") && hasAll("hbp") && hasAll("ab") && hasAll("sf")
+    ? safeDivide(
+        (h ?? 0) + (bb ?? 0) + (hbp ?? 0),
+        (ab ?? 0) + (bb ?? 0) + (hbp ?? 0) + (sf ?? 0)
+      )
+    : null;
+
+  const slg = hasAll("tb") && hasAll("ab")
+    ? safeDivide(tb, ab)
+    : null;
+
   const ops = obp !== null && slg !== null ? obp + slg : null;
 
+  const babip = hasAll("h") && hasAll("hr") && hasAll("ab") && hasAll("k") && hasAll("sf")
+    ? safeDivide(
+        (h ?? 0) - (hr ?? 0),
+        (ab ?? 0) - (k ?? 0) - (hr ?? 0) + (sf ?? 0)
+      )
+    : null;
   return {
     year: label,
     team: "-",
     level: "合計",
     ...total,
+
     avg,
     obp,
     slg,
     ops,
+
     goAo: "-",
-    kRate: safeDivide(total.k * 100, total.pa),
-    bbRate: safeDivide(total.bb * 100, total.pa),
-    babip: safeDivide(total.h - total.hr, total.ab - total.k - total.hr + total.sf),
+
+    kRate:
+      hasAll("k") && hasAll("pa")
+        ? safeDivide((k ?? 0) * 100, pa)
+        : null,
+
+    bbRate:
+      hasAll("bb") && hasAll("pa")
+        ? safeDivide((bb ?? 0) * 100, pa)
+        : null,
+
+    babip,
   };
 }
 
 function getPitcherTotalRow(rows: any[], label = "合計") {
   const total = getTotal(rows);
-  const ip = total.ipOuts / 3;
+
+  const ipOuts = toNumber(total.ipOuts);
+  const ip = ipOuts !== null ? ipOuts / 3 : null;
+
+  const er = toNumber(total.er);
+  const bb = toNumber(total.bb);
+  const h = toNumber(total.h);
+  const k = toNumber(total.k);
+  const hr = toNumber(total.hr);
+  const hbp = toNumber(total.hbp);
+  const bf = toNumber(total.bf);
 
   return {
     year: label,
     team: "-",
     level: "合計",
     ...total,
-    era: safeDivide(total.er * 9, ip),
-    ipDisplay: outsToIp(total.ipOuts),
-    avgAgainst: "-",
-    whip: safeDivide(total.bb + total.h, ip),
-    goAo: "-",
-    k9: safeDivide(total.k * 9, ip),
-    bb9: safeDivide(total.bb * 9, ip),
-    hr9: safeDivide(total.hr * 9, ip),
-    h9: safeDivide(total.h * 9, ip),
-    kbb: safeDivide(total.k, total.bb),
+
+    era:
+      ip !== null && er !== null
+        ? safeDivide(er * 9, ip)
+        : null,
+
+    ipDisplay:
+      ipOuts !== null
+        ? outsToIp(ipOuts)
+        : "-",
+
+    whip:
+      ip !== null && bb !== null && h !== null
+        ? safeDivide(bb + h, ip)
+        : null,
+
+    k9:
+      ip !== null && k !== null
+        ? safeDivide(k * 9, ip)
+        : null,
+
+    bb9:
+      ip !== null && bb !== null
+        ? safeDivide(bb * 9, ip)
+        : null,
+
+    hr9:
+      ip !== null && hr !== null
+        ? safeDivide(hr * 9, ip)
+        : null,
+
+    h9:
+      ip !== null && h !== null
+        ? safeDivide(h * 9, ip)
+        : null,
+
+    kbb:
+      k !== null && bb !== null
+        ? safeDivide(k, bb)
+        : null,
+
+    kRate:
+      k !== null && bf !== null
+        ? safeDivide(k, bf)
+        : null,
+
+    bbRate:
+      bb !== null && bf !== null
+        ? safeDivide(bb, bf)
+        : null,
+
+    hrRate:
+      hr !== null && bf !== null
+        ? safeDivide(hr, bf)
+        : null,
+
+    hbpRate:
+      hbp !== null && bf !== null
+        ? safeDivide(hbp, bf)
+        : null,
+
+    obpAgainst:
+      h !== null && bb !== null && hbp !== null && bf !== null
+        ? safeDivide(h + bb + hbp, bf)
+        : null,
   };
+}
+
+function sumReportValues(rows: any[], getter: (row: any) => unknown) {
+  if (!rows.length) return null;
+
+  let sum = 0;
+
+  for (const row of rows) {
+    const value = toNumber(getter(row));
+
+    if (value === null) return null;
+
+    sum += value;
+  }
+
+  return sum;
+}
+
+function reportIpToOuts(row: any) {
+  const explicitOuts = toNumber(row.ip_outs);
+
+  if (explicitOuts !== null) return explicitOuts;
+
+  return ipToOutsNullable(row.ip);
+}
+
+function sumReportIpOuts(rows: any[]) {
+  if (!rows.length) return null;
+
+  let sum = 0;
+
+  for (const row of rows) {
+    const outs = reportIpToOuts(row);
+
+    if (outs === null) return null;
+
+    sum += outs;
+  }
+
+  return sum;
 }
 
 function getEventContent(event: any) {
@@ -633,23 +885,25 @@ const HITTER_HEADERS = [
 
 const PITCHER_HEADERS = [
   "年份", "球隊", "層級", "勝", "敗", "防禦率", "出賽", "先發", "完投",
-  "完封", "中繼成功", "救援成功", "救援機會", "投球局數", "被安打",
+  "完封", "中繼成功", "救援成功", "救援機會", "投球局數", "打者", "被安打",
   "失分", "責失", "被全壘打", "球數", "觸身球", "保送", "故意四壞",
-  "三振", "被打擊率", "每局被上壘率", "滾飛比", "K/9", "BB/9",
-  "HR/9", "H/9", "K/BB",
+  "三振", "被打擊率", "每局被上壘率", "對手上壘率", "滾飛比", "K/9", "BB/9",
+  "HR/9", "H/9", "K/BB", "K%", "BB%", "HR%", "HBP%",
 ];
 
 function HitterTable({ rows, totalRow }: { rows: any[]; totalRow: any }) {
   return (
-    <table className="w-max min-w-[1700px] whitespace-nowrap text-sm">
-      <TableHead headers={HITTER_HEADERS} />
-      <tbody>
-        {rows.map((row, index) => (
-          <HitterRow key={`${row.year}-${row.team}-${row.level}-${index}`} row={row} />
-        ))}
-        <HitterRow row={totalRow} bold />
-      </tbody>
-    </table>
+    <div className="w-full overflow-x-auto">
+      <table className="w-max min-w-[1700px] whitespace-nowrap text-sm">
+        <TableHead headers={HITTER_HEADERS} />
+        <tbody>
+          {rows.map((row, index) => (
+            <HitterRow key={`${row.year}-${row.team}-${row.level}-${index}`} row={row} />
+          ))}
+          <HitterRow row={totalRow} bold />
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -665,38 +919,40 @@ function HitterHistoryTable({
   allTotalRow: any;
 }) {
   return (
-    <table className="w-max min-w-[1700px] whitespace-nowrap text-sm">
-      <TableHead headers={HITTER_HEADERS} />
-      <tbody>
-        {groups.map((group) => {
-          const expanded = expandedYears.includes(group.year);
+    <div className="w-full overflow-x-auto">
+      <table className="w-max min-w-[1700px] whitespace-nowrap text-sm">
+        <TableHead headers={HITTER_HEADERS} />
+        <tbody>
+          {groups.map((group) => {
+            const expanded = expandedYears.includes(group.year);
 
-          return (
-            <React.Fragment key={group.year}>
-              <HitterRow
-                row={group.total}
-                bold
-                clickable
-                prefix={expanded ? "▼" : "▶"}
-                onClick={() => toggleYear(group.year)}
-              />
+            return (
+              <React.Fragment key={group.year}>
+                <HitterRow
+                  row={group.total}
+                  bold
+                  clickable
+                  prefix={expanded ? "▼" : "▶"}
+                  onClick={() => toggleYear(group.year)}
+                />
 
-              {expanded
-                ? group.rows.map((row: any, index: number) => (
-                    <HitterRow
-                      key={`${row.year}-${row.team}-${row.level}-${index}`}
-                      row={row}
-                      indent
-                    />
-                  ))
-                : null}
-            </React.Fragment>
-          );
-        })}
+                {expanded
+                  ? group.rows.map((row: any, index: number) => (
+                      <HitterRow
+                        key={`${row.year}-${row.team}-${row.level}-${index}`}
+                        row={row}
+                        indent
+                      />
+                    ))
+                  : null}
+              </React.Fragment>
+            );
+          })}
 
-        <HitterRow row={{ ...allTotalRow, year: "生涯" }} bold />
-      </tbody>
-    </table>
+          <HitterRow row={{ ...allTotalRow, year: "生涯" }} bold />
+        </tbody>
+      </table>
+     </div>
   );
 }
 
@@ -735,23 +991,23 @@ function HitterRow({
       <td className={`sticky left-[210px] z-20 w-[90px] min-w-[90px] ${stickyBg} p-3`}>
         {displayValue(row.level)}
       </td>
-      <td className="p-3">{row.games}</td>
-      <td className="p-3">{row.pa}</td>
-      <td className="p-3">{row.ab}</td>
-      <td className="p-3">{row.r}</td>
-      <td className="p-3">{row.h}</td>
-      <td className="p-3">{row.tb}</td>
-      <td className="p-3">{row.doubles}</td>
-      <td className="p-3">{row.triples}</td>
-      <td className="p-3">{row.hr}</td>
-      <td className="p-3">{row.rbi}</td>
-      <td className="p-3">{row.bb}</td>
-      <td className="p-3">{row.ibb}</td>
-      <td className="p-3">{row.hbp}</td>
-      <td className="p-3">{row.k}</td>
-      <td className="p-3">{row.sb}</td>
-      <td className="p-3">{row.cs}</td>
-      <td className="p-3">{row.sf}</td>
+      <td className="p-3">{displayValue(row.games)}</td>
+      <td className="p-3">{displayValue(row.pa)}</td>
+      <td className="p-3">{displayValue(row.ab)}</td>
+      <td className="p-3">{displayValue(row.r)}</td>
+      <td className="p-3">{displayValue(row.h)}</td>
+      <td className="p-3">{displayValue(row.tb)}</td>
+      <td className="p-3">{displayValue(row.doubles)}</td>
+      <td className="p-3">{displayValue(row.triples)}</td>
+      <td className="p-3">{displayValue(row.hr)}</td>
+      <td className="p-3">{displayValue(row.rbi)}</td>
+      <td className="p-3">{displayValue(row.bb)}</td>
+      <td className="p-3">{displayValue(row.ibb)}</td>
+      <td className="p-3">{displayValue(row.hbp)}</td>
+      <td className="p-3">{displayValue(row.k)}</td>
+      <td className="p-3">{displayValue(row.sb)}</td>
+      <td className="p-3">{displayValue(row.cs)}</td>
+      <td className="p-3">{displayValue(row.sf)}</td>
       <td className="p-3">{formatRate(row.avg)}</td>
       <td className="p-3">{formatRate(row.obp)}</td>
       <td className="p-3">{formatRate(row.slg)}</td>
@@ -766,15 +1022,17 @@ function HitterRow({
 
 function PitcherTable({ rows, totalRow }: { rows: any[]; totalRow: any }) {
   return (
-    <table className="w-full min-w-[1850px] text-sm">
-      <TableHead headers={PITCHER_HEADERS} />
-      <tbody>
-        {rows.map((row, index) => (
-          <PitcherRow key={`${row.year}-${row.team}-${row.level}-${index}`} row={row} />
-        ))}
-        <PitcherRow row={totalRow} bold />
-      </tbody>
-    </table>
+    <div className="w-full overflow-x-auto">
+      <table className="w-max min-w-[2100px] text-sm">
+        <TableHead headers={PITCHER_HEADERS} />
+        <tbody>
+          {rows.map((row, index) => (
+            <PitcherRow key={`${row.year}-${row.team}-${row.level}-${index}`} row={row} />
+          ))}
+          <PitcherRow row={totalRow} bold />
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -790,38 +1048,40 @@ function PitcherHistoryTable({
   allTotalRow: any;
 }) {
   return (
-    <table className="w-full min-w-[1850px] text-sm">
-      <TableHead headers={PITCHER_HEADERS} />
-      <tbody>
-        {groups.map((group) => {
-          const expanded = expandedYears.includes(group.year);
+    <div className="w-full overflow-x-auto">
+      <table className="w-max min-w-[2100px] text-sm">
+        <TableHead headers={PITCHER_HEADERS} />
+        <tbody>
+          {groups.map((group) => {
+            const expanded = expandedYears.includes(group.year);
 
-          return (
-            <React.Fragment key={group.year}>
-              <PitcherRow
-                row={group.total}
-                bold
-                clickable
-                prefix={expanded ? "▼" : "▶"}
-                onClick={() => toggleYear(group.year)}
-              />
+            return (
+              <React.Fragment key={group.year}>
+                <PitcherRow
+                  row={group.total}
+                  bold
+                  clickable
+                  prefix={expanded ? "▼" : "▶"}
+                  onClick={() => toggleYear(group.year)}
+                />
 
-              {expanded
-                ? group.rows.map((row: any, index: number) => (
-                    <PitcherRow
-                      key={`${row.year}-${row.team}-${row.level}-${index}`}
-                      row={row}
-                      indent
-                    />
-                  ))
-                : null}
-            </React.Fragment>
-          );
-        })}
+                {expanded
+                  ? group.rows.map((row: any, index: number) => (
+                      <PitcherRow
+                        key={`${row.year}-${row.team}-${row.level}-${index}`}
+                        row={row}
+                        indent
+                      />
+                    ))
+                  : null}
+              </React.Fragment>
+            );
+          })}
 
-        <PitcherRow row={{ ...allTotalRow, year: "生涯" }} bold />
-      </tbody>
-    </table>
+          <PitcherRow row={{ ...allTotalRow, year: "生涯" }} bold />
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -840,12 +1100,30 @@ function PitcherRow({
   indent?: boolean;
   onClick?: () => void;
 }) {
-  const ip = toNumber(row.ipOuts) / 3;
-  const k9 = row.k9 ?? safeDivide(row.k * 9, ip);
-  const bb9 = row.bb9 ?? safeDivide(row.bb * 9, ip);
-  const hr9 = row.hr9 ?? safeDivide(row.hr * 9, ip);
-  const h9 = row.h9 ?? safeDivide(row.h * 9, ip);
-  const kbb = row.kbb ?? safeDivide(row.k, row.bb);
+  const ipOuts = toNumber(row.ipOuts);
+  const ip = ipOuts !== null ? ipOuts / 3 : null;
+
+  const bf = toNumber(row.bf);
+  const h = toNumber(row.h);
+  const bb = toNumber(row.bb);
+  const hbp = toNumber(row.hbp);
+  const hr = toNumber(row.hr);
+  const k = toNumber(row.k);
+
+  const k9 = row.k9 ?? safeDivide(k !== null ? k * 9 : null, ip);
+
+  const bb9 = row.bb9 ?? safeDivide(bb !== null ? bb * 9 : null, ip);
+  const hr9 = row.hr9 ?? safeDivide(hr !== null ? hr * 9 : null, ip);
+  const h9 = row.h9 ?? safeDivide(h !== null ? h * 9 : null, ip);
+  const kbb = row.kbb ?? safeDivide(k, bb);
+  const kRate = row.kRate ?? safeDivide(k, bf);
+  const bbRate = row.bbRate ?? safeDivide(bb, bf);
+  const hrRate = row.hrRate ?? safeDivide(hr, bf);
+  const hbpRate = row.hbpRate ?? safeDivide(hbp, bf);
+  const obpAgainst = row.obpAgainst ?? safeDivide(
+    h !== null && bb !== null && hbp !== null ? h + bb + hbp : null,
+    bf
+  );
 
   const className = [
     "border-t border-slate-800",
@@ -867,34 +1145,40 @@ function PitcherRow({
       <td className={`sticky left-[210px] z-20 w-[90px] min-w-[90px] ${stickyBg} p-3`}>
         {displayValue(row.level)}
       </td>
-      <td className="p-3">{row.win}</td>
-      <td className="p-3">{row.loss}</td>
+      <td className="p-3">{displayValue(row.win)}</td>
+      <td className="p-3">{displayValue(row.loss)}</td>
       <td className="p-3">{formatDecimal(row.era)}</td>
-      <td className="p-3">{row.games}</td>
-      <td className="p-3">{row.gs}</td>
-      <td className="p-3">{row.cg}</td>
-      <td className="p-3">{row.sho}</td>
-      <td className="p-3">{row.hold}</td>
-      <td className="p-3">{row.save}</td>
-      <td className="p-3">{row.svo}</td>
-      <td className="p-3">{row.ipDisplay || outsToIp(row.ipOuts)}</td>
-      <td className="p-3">{row.h}</td>
-      <td className="p-3">{row.r}</td>
-      <td className="p-3">{row.er}</td>
-      <td className="p-3">{row.hr}</td>
-      <td className="p-3">{row.pitchCount}</td>
-      <td className="p-3">{row.hbp}</td>
-      <td className="p-3">{row.bb}</td>
-      <td className="p-3">{row.ibb}</td>
-      <td className="p-3">{row.k}</td>
+      <td className="p-3">{displayValue(row.games)}</td>
+      <td className="p-3">{displayValue(row.gs)}</td>
+      <td className="p-3">{displayValue(row.cg)}</td>
+      <td className="p-3">{displayValue(row.sho)}</td>
+      <td className="p-3">{displayValue(row.hold)}</td>
+      <td className="p-3">{displayValue(row.save)}</td>
+      <td className="p-3">{displayValue(row.svo)}</td>
+      <td className="p-3">{displayValue(row.ipDisplay || outsToIp(row.ipOuts))}</td>
+      <td className="p-3">{displayValue(row.bf)}</td>
+      <td className="p-3">{displayValue(row.h)}</td>
+      <td className="p-3">{displayValue(row.runsAllowed)}</td>
+      <td className="p-3">{displayValue(row.er)}</td>
+      <td className="p-3">{displayValue(row.hr)}</td>
+      <td className="p-3">{displayValue(row.pitchCount)}</td>
+      <td className="p-3">{displayValue(row.hbp)}</td>
+      <td className="p-3">{displayValue(row.bb)}</td>
+      <td className="p-3">{displayValue(row.ibb)}</td>
+      <td className="p-3">{displayValue(row.k)}</td>
       <td className="p-3">{displayValue(row.avgAgainst)}</td>
       <td className="p-3">{formatDecimal(row.whip)}</td>
+      <td className="p-3">{formatRate(obpAgainst)}</td>
       <td className="p-3">{displayValue(row.goAo)}</td>
-      <td className="p-3">{formatDecimal(k9)}</td>
-      <td className="p-3">{formatDecimal(bb9)}</td>
-      <td className="p-3">{formatDecimal(hr9)}</td>
-      <td className="p-3">{formatDecimal(h9)}</td>
-      <td className="p-3">{formatDecimal(kbb)}</td>
+      <td className="p-3">{k9 != null ? formatDecimal(k9) : "-"}</td>
+      <td className="p-3">{bb9 != null ? formatDecimal(bb9) : "-"}</td>
+      <td className="p-3">{hr9 != null ? formatDecimal(hr9) : "-"}</td>
+      <td className="p-3">{h9 != null ? formatDecimal(h9) : "-"}</td>
+      <td className="p-3">{kbb != null ? formatDecimal(kbb) : "-"}</td>
+      <td className="p-3">{formatPercent(kRate)}</td>
+      <td className="p-3">{formatPercent(bbRate)}</td>
+      <td className="p-3">{formatPercent(hrRate)}</td>
+      <td className="p-3">{formatPercent(hbpRate)}</td>
     </tr>
   );
 }
@@ -971,7 +1255,28 @@ function GameList({
   }
 
   const battingGroups = groupByMonth(battingReports);
-  const pitchingGroups = groupByMonth(pitchingReports);
+  let seasonHits = 0;
+  let seasonWalks = 0;
+  let seasonOuts = 0;
+
+  const pitchingReportsWithCumulativeWhip = [...pitchingReports]
+    .sort((a, b) => String(a.report_date || "").localeCompare(String(b.report_date || "")))
+    .map((report) => {
+      seasonHits += toNumber(report.h) ?? 0;
+      seasonWalks += toNumber(report.bb) ?? 0;
+      seasonOuts += toNumber(report.ip_outs) ?? 0;
+
+      return {
+        ...report,
+        cumulativeWhip:
+          seasonOuts > 0
+            ? ((seasonHits + seasonWalks) / (seasonOuts / 3)).toFixed(2)
+            : "-",
+      };
+    })
+    .sort((a, b) => String(b.report_date || "").localeCompare(String(a.report_date || "")));
+
+  const pitchingGroups = groupByMonth(pitchingReportsWithCumulativeWhip);
 
   return (
     <div className="space-y-6">
@@ -1034,6 +1339,7 @@ const PITCHING_GAME_HEADERS = [
   "救援成功",
   "救援機會",
   "投球局數",
+  "打者",
   "被安打",
   "失分",
   "責失",
@@ -1068,6 +1374,7 @@ const PITCHING_GAME_COL_WIDTHS = [
   84, // 救援成功
   84, // 救援機會
   84, // 投球局數
+  64, // 打者
   72, // 被安打
   64, // 失分
   64, // 責失
@@ -1107,66 +1414,65 @@ function formatGameDate(value: unknown) {
   return raw.slice(0, 10);
 }
 
-function formatGameIp(value: unknown) {
-  const raw = text(value);
-  if (!raw) return "0.0";
+function formatGameIp(report: any) {
+  const explicitOuts = toNumber(report.ip_outs);
+
+  if (explicitOuts !== null) {
+    return outsToIp(explicitOuts);
+  }
+
+  const raw = text(report.ip);
+  if (!raw) return "-";
+
+  // 舊資料若只存在 ip 欄位，ip 仍以棒球 IP 格式顯示，例如 5 / 5.1 / 5.2。
   if (!raw.includes(".")) return `${raw}.0`;
+
   return raw;
 }
 
 function getBattingGameTotal(reports: any[]) {
-  return reports.reduce(
-    (sum, report) => ({
-      ab: sum.ab + toNumber(report.ab),
-      r: sum.r + toNumber(report.r),
-      h: sum.h + toNumber(report.h),
-      tb: sum.tb + toNumber(report.tb),
-      doubles: sum.doubles + toNumber(report.doubles),
-      triples: sum.triples + toNumber(report.triples),
-      hr: sum.hr + toNumber(report.hr),
-      rbi: sum.rbi + toNumber(report.rbi),
-      bb: sum.bb + toNumber(report.bb),
-      ibb: sum.ibb + toNumber(report.ibb),
-      k: sum.k + toNumber(report.k),
-      sb: sum.sb + toNumber(report.sb),
-      cs: sum.cs + toNumber(report.cs),
-      hbp: sum.hbp + toNumber(report.hbp),
-      sf: sum.sf + toNumber(report.sf),
-    }),
-    {
-      ab: 0, r: 0, h: 0, tb: 0, doubles: 0, triples: 0, hr: 0,
-      rbi: 0, bb: 0, ibb: 0, k: 0, sb: 0, cs: 0, hbp: 0, sf: 0,
-    }
-  );
+  return {
+    ab: sumReportValues(reports, (report) => report.ab),
+    r: sumReportValues(reports, (report) => report.r),
+    h: sumReportValues(reports, (report) => report.h),
+    tb: sumReportValues(reports, (report) => report.tb),
+    doubles: sumReportValues(reports, (report) => report.doubles),
+    triples: sumReportValues(reports, (report) => report.triples),
+    hr: sumReportValues(reports, (report) => report.hr),
+    rbi: sumReportValues(reports, (report) => report.rbi),
+    bb: sumReportValues(reports, (report) => report.bb),
+    ibb: sumReportValues(reports, (report) => report.ibb),
+    k: sumReportValues(reports, (report) => report.k),
+    sb: sumReportValues(reports, (report) => report.sb),
+    cs: sumReportValues(reports, (report) => report.cs),
+    hbp: sumReportValues(reports, (report) => report.hbp),
+    sf: sumReportValues(reports, (report) => report.sf),
+  };
 }
 
 function getPitchingGameTotal(reports: any[]) {
-  return reports.reduce(
-    (sum, report) => ({
-      ipOuts: sum.ipOuts + ipToOuts(report.ip),
-      win: sum.win + toNumber(report.w ?? report.win ?? report.wins),
-      loss: sum.loss + toNumber(report.l ?? report.loss ?? report.losses),
-      g: sum.g + toNumber(report.g || 1),
-      gs: sum.gs + toNumber(report.gs),
-      cg: sum.cg + toNumber(report.cg),
-      sho: sum.sho + toNumber(report.sho),
-      save: sum.save + toNumber(report.sv || report.save),
-      svo: sum.svo + toNumber(report.svo),
-      h: sum.h + toNumber(report.h),
-      r: sum.r + toNumber(report.r),
-      er: sum.er + toNumber(report.er),
-      hr: sum.hr + toNumber(report.hr),
-      bb: sum.bb + toNumber(report.bb),
-      ibb: sum.ibb + toNumber(report.ibb),
-      k: sum.k + toNumber(report.k),
-      hbp: sum.hbp + toNumber(report.hb || report.hbp),
-      pitchCount: sum.pitchCount + toNumber(report.pitch_count),
-    }),
-    {
-      ipOuts: 0, win: 0,  loss: 0,  g: 0,  gs: 0,  cg: 0,  sho: 0,  save: 0,  svo: 0,
-      h: 0,  r: 0,  er: 0,  hr: 0,  bb: 0,  ibb: 0,  k: 0,  hbp: 0,  pitchCount: 0,
-    }
-  );
+  return {
+    ipOuts: sumReportIpOuts(reports),
+    win: sumReportValues(reports, (report) => report.w ?? report.win ?? report.wins),
+    loss: sumReportValues(reports, (report) => report.l ?? report.loss ?? report.losses),
+    g: sumReportValues(reports, (report) => report.g ?? 1),
+    gs: sumReportValues(reports, (report) => report.gs),
+    cg: sumReportValues(reports, (report) => report.cg),
+    sho: sumReportValues(reports, (report) => report.sho),
+    save: sumReportValues(reports, (report) => report.sv ?? report.save),
+    svo: sumReportValues(reports, (report) => report.svo),
+    bf: sumReportValues(reports, (report) => report.bf ?? report.batters_faced ?? report.battersFaced),
+    h: sumReportValues(reports, (report) => report.h),
+    r: sumReportValues(reports, (report) => report.r),
+    runsAllowed: sumReportValues(reports, (report) => report.r),
+    er: sumReportValues(reports, (report) => report.er),
+    hr: sumReportValues(reports, (report) => report.hr),
+    bb: sumReportValues(reports, (report) => report.bb),
+    ibb: sumReportValues(reports, (report) => report.ibb),
+    k: sumReportValues(reports, (report) => report.k),
+    hbp: sumReportValues(reports, (report) => report.hb ?? report.hbp),
+    pitchCount: sumReportValues(reports, (report) => report.pitch_count),
+  };
 }
 
 function BattingGameTable({ reports }: { reports: any[] }) {
@@ -1211,26 +1517,26 @@ function BattingGameTable({ reports }: { reports: any[] }) {
             <td className="p-3">{getGameTeam(report)}</td>
             <td className="p-3 overflow-hidden text-ellipsis">{displayValue(report.opponent)}</td>
 
-            <td className="p-3">{toNumber(report.ab)}</td>
-            <td className="p-3">{toNumber(report.r)}</td>
-            <td className="p-3">{toNumber(report.h)}</td>
-            <td className="p-3">{toNumber(report.tb)}</td>
-            <td className="p-3">{toNumber(report.doubles)}</td>
-            <td className="p-3">{toNumber(report.triples)}</td>
-            <td className="p-3">{toNumber(report.hr)}</td>
-            <td className="p-3">{toNumber(report.rbi)}</td>
-            <td className="p-3">{toNumber(report.bb)}</td>
-            <td className="p-3">{toNumber(report.ibb)}</td>
-            <td className="p-3">{toNumber(report.k)}</td>
-            <td className="p-3">{toNumber(report.sb)}</td>
-            <td className="p-3">{toNumber(report.cs)}</td>
+            <td className="p-3">{displayValue(toNumber(report.ab))}</td>
+            <td className="p-3">{displayValue(toNumber(report.r))}</td>
+            <td className="p-3">{displayValue(toNumber(report.h))}</td>
+            <td className="p-3">{displayValue(toNumber(report.tb))}</td>
+            <td className="p-3">{displayValue(toNumber(report.doubles))}</td>
+            <td className="p-3">{displayValue(toNumber(report.triples))}</td>
+            <td className="p-3">{displayValue(toNumber(report.hr))}</td>
+            <td className="p-3">{displayValue(toNumber(report.rbi))}</td>
+            <td className="p-3">{displayValue(toNumber(report.bb))}</td>
+            <td className="p-3">{displayValue(toNumber(report.ibb))}</td>
+            <td className="p-3">{displayValue(toNumber(report.k))}</td>
+            <td className="p-3">{displayValue(toNumber(report.sb))}</td>
+            <td className="p-3">{displayValue(toNumber(report.cs))}</td>
 
             <td className="p-3">{displayValue(report.avg)}</td>
             <td className="p-3">{displayValue(report.obp)}</td>
             <td className="p-3">{displayValue(report.slg)}</td>
 
-            <td className="p-3">{toNumber(report.hbp)}</td>
-            <td className="p-3">{toNumber(report.sf)}</td>
+            <td className="p-3">{displayValue(toNumber(report.hbp))}</td>
+            <td className="p-3">{displayValue(toNumber(report.sf))}</td>
           </tr>
         ))}
 
@@ -1242,19 +1548,19 @@ function BattingGameTable({ reports }: { reports: any[] }) {
             <td className="p-3">-</td>
             <td className="p-3 overflow-hidden text-ellipsis">-</td>
 
-            <td className="p-3">{total.ab}</td>
-            <td className="p-3">{total.r}</td>
-            <td className="p-3">{total.h}</td>
-            <td className="p-3">{total.tb}</td>
-            <td className="p-3">{total.doubles}</td>
-            <td className="p-3">{total.triples}</td>
-            <td className="p-3">{total.hr}</td>
-            <td className="p-3">{total.rbi}</td>
-            <td className="p-3">{total.bb}</td>
-            <td className="p-3">{total.ibb}</td>
-            <td className="p-3">{total.k}</td>
-            <td className="p-3">{total.sb}</td>
-            <td className="p-3">{total.cs}</td>
+            <td className="p-3">{displayValue(total.ab)}</td>
+            <td className="p-3">{displayValue(total.r)}</td>
+            <td className="p-3">{displayValue(total.h)}</td>
+            <td className="p-3">{displayValue(total.tb)}</td>
+            <td className="p-3">{displayValue(total.doubles)}</td>
+            <td className="p-3">{displayValue(total.triples)}</td>
+            <td className="p-3">{displayValue(total.hr)}</td>
+            <td className="p-3">{displayValue(total.rbi)}</td>
+            <td className="p-3">{displayValue(total.bb)}</td>
+            <td className="p-3">{displayValue(total.ibb)}</td>
+            <td className="p-3">{displayValue(total.k)}</td>
+            <td className="p-3">{displayValue(total.sb)}</td>
+            <td className="p-3">{displayValue(total.cs)}</td>
 
             <td className="p-3">
               {formatRate(safeDivide(total.h, total.ab))}
@@ -1263,8 +1569,8 @@ function BattingGameTable({ reports }: { reports: any[] }) {
             <td className="p-3">-</td>
             <td className="p-3">-</td>
 
-            <td className="p-3">{total.hbp}</td>
-            <td className="p-3">{total.sf}</td>
+            <td className="p-3">{displayValue(total.hbp)}</td>
+            <td className="p-3">{displayValue(total.sf)}</td>
           </tr>
         </tbody>
       </table>
@@ -1275,6 +1581,10 @@ function BattingGameTable({ reports }: { reports: any[] }) {
 function PitchingGameTable({ reports }: { reports: any[] }) {
 
   const total = getPitchingGameTotal(reports);
+  
+  let cumulativeHits = 0;
+  let cumulativeWalks = 0;
+  let cumulativeOuts = 0;
 
   return (
     <div className="max-h-[520px] overflow-auto rounded-xl border border-slate-800">
@@ -1305,45 +1615,64 @@ function PitchingGameTable({ reports }: { reports: any[] }) {
       </thead>
 
       <tbody>
-        {reports.map((report) => (
-          <tr
-            key={report.id || `${report.report_date}-${report.result}`}
-            className="border-t border-slate-800"
-          >
-            <td className="sticky left-0 z-30 w-[120px] min-w-[120px] bg-slate-900 p-3">{formatGameDate(report.report_date)}</td>
-            <td className="p-3">{getGameTeam(report)}</td>
-            <td className="p-3 overflow-hidden text-ellipsis">{displayValue(report.opponent)}</td>
+        {reports.map((report) => {
 
-            <td className="p-3">{toNumber(report.w ?? report.win ?? report.wins)}</td>
-            <td className="p-3">{toNumber(report.l ?? report.loss ?? report.losses)}</td>
-            <td className="p-3">{displayValue(report.era)}</td>
-            <td className="p-3">{toNumber(report.g || 1)}</td>
-            <td className="p-3">{toNumber(report.gs)}</td>
-            <td className="p-3">{toNumber(report.cg)}</td>
-            <td className="p-3">{toNumber(report.sho)}</td>
-            <td className="p-3">{toNumber(report.sv || report.save)}</td>
-            <td className="p-3">{toNumber(report.svo)}</td>
+          const outs = toNumber(report.ip_outs);
 
-            <td className="p-3">{formatGameIp(report.ip)}</td>
-            <td className="p-3">{toNumber(report.h)}</td>
-            <td className="p-3">{toNumber(report.r)}</td>
-            <td className="p-3">{toNumber(report.er)}</td>
-            <td className="p-3">{toNumber(report.hr)}</td>
-            <td className="p-3">{toNumber(report.hb || report.hbp)}</td>
-            <td className="p-3">{toNumber(report.bb)}</td>
-            <td className="p-3">{toNumber(report.ibb)}</td>
-            <td className="p-3">{toNumber(report.k)}</td>
-            <td className="p-3">
-              {displayValue(
-                report.np_s ||
-                report.nps ||
-                report.pitch_count
-              )}
-            </td>
-            <td className="p-3">{displayValue(report.avg)}</td>
-            <td className="p-3">{displayValue(report.whip)}</td>
-          </tr>
-        ))}
+          cumulativeHits += toNumber(report.h) ?? 0;
+          cumulativeWalks += toNumber(report.bb) ?? 0;
+          cumulativeOuts += outs ?? 0;
+
+          const cumulativeWhip =
+            cumulativeOuts > 0
+              ? (
+                  (cumulativeHits + cumulativeWalks) /
+                  (cumulativeOuts / 3)
+                ).toFixed(2)
+              : "-";
+
+          return (
+
+            <tr
+              key={report.id || `${report.report_date}-${report.result}`}
+              className="border-t border-slate-800"
+            >
+              <td className="sticky left-0 z-30 w-[120px] min-w-[120px] bg-slate-900 p-3">{formatGameDate(report.report_date)}</td>
+              <td className="p-3">{getGameTeam(report)}</td>
+              <td className="p-3 overflow-hidden text-ellipsis">{displayValue(report.opponent)}</td>
+
+              <td className="p-3">{displayValue(toNumber(report.w ?? report.win ?? report.wins))}</td>
+              <td className="p-3">{displayValue(toNumber(report.l ?? report.loss ?? report.losses))}</td>
+              <td className="p-3">{displayValue(report.era)}</td>
+              <td className="p-3">{displayValue(toNumber(report.g ?? 1))}</td>
+              <td className="p-3">{displayValue(toNumber(report.gs))}</td>
+              <td className="p-3">{displayValue(toNumber(report.cg))}</td>
+              <td className="p-3">{displayValue(toNumber(report.sho))}</td>
+              <td className="p-3">{displayValue(toNumber(report.sv ?? report.save))}</td>
+              <td className="p-3">{displayValue(toNumber(report.svo))}</td>
+
+              <td className="p-3">{formatGameIp(report)}</td>
+              <td className="p-3">{displayValue(toNumber(report.bf ?? report.batters_faced ?? report.battersFaced))}</td>
+              <td className="p-3">{displayValue(toNumber(report.h))}</td>
+              <td className="p-3">{displayValue(toNumber(report.r))}</td>
+              <td className="p-3">{displayValue(toNumber(report.er))}</td>
+              <td className="p-3">{displayValue(toNumber(report.hr))}</td>
+              <td className="p-3">{displayValue(toNumber(report.hb ?? report.hbp))}</td>
+              <td className="p-3">{displayValue(toNumber(report.bb))}</td>
+              <td className="p-3">{displayValue(toNumber(report.ibb))}</td>
+              <td className="p-3">{displayValue(toNumber(report.k))}</td>
+              <td className="p-3">
+                {displayValue(
+                  report.np_s ||
+                  report.nps ||
+                  report.pitch_count
+                )}
+              </td>
+              <td className="p-3">{displayValue(report.avg)}</td>
+              <td className="p-3">{displayValue(report.cumulativeWhip)}</td>
+            </tr>
+          );
+        })}
 
           <tr className="border-t border-slate-700 bg-slate-800/60 font-bold">
             <td className="sticky left-0 z-30 w-[120px] min-w-[120px] bg-slate-800 p-3">
@@ -1353,43 +1682,44 @@ function PitchingGameTable({ reports }: { reports: any[] }) {
             <td className="p-3">-</td>
             <td className="p-3 overflow-hidden text-ellipsis">-</td>
 
-            <td className="p-3">{total.win}</td>
-            <td className="p-3">{total.loss}</td>
+            <td className="p-3">{displayValue(total.win)}</td>
+            <td className="p-3">{displayValue(total.loss)}</td>
 
             <td className="p-3">
               {formatDecimal(
-                safeDivide(total.er * 9, total.ipOuts / 3)
+                safeDivide(total.er !== null ? total.er * 9 : null, total.ipOuts !== null ? total.ipOuts / 3 : null)
               )}
             </td>
 
-            <td className="p-3">{total.g}</td>
-            <td className="p-3">{total.gs}</td>
-            <td className="p-3">{total.cg}</td>
-            <td className="p-3">{total.sho}</td>
-            <td className="p-3">{total.save}</td>
-            <td className="p-3">{total.svo}</td>
+            <td className="p-3">{displayValue(total.g)}</td>
+            <td className="p-3">{displayValue(total.gs)}</td>
+            <td className="p-3">{displayValue(total.cg)}</td>
+            <td className="p-3">{displayValue(total.sho)}</td>
+            <td className="p-3">{displayValue(total.save)}</td>
+            <td className="p-3">{displayValue(total.svo)}</td>
 
             <td className="p-3">
               {outsToIp(total.ipOuts)}
             </td>
 
-            <td className="p-3">{total.h}</td>
-            <td className="p-3">{total.r}</td>
-            <td className="p-3">{total.er}</td>
-            <td className="p-3">{total.hr}</td>
-            <td className="p-3">{total.hbp}</td>
-            <td className="p-3">{total.bb}</td>
-            <td className="p-3">{total.ibb}</td>
-            <td className="p-3">{total.k}</td>
-            <td className="p-3">{total.pitchCount}</td>
+            <td className="p-3">{displayValue(total.bf)}</td>
+            <td className="p-3">{displayValue(total.h)}</td>
+            <td className="p-3">{displayValue(total.runsAllowed)}</td>
+            <td className="p-3">{displayValue(total.er)}</td>
+            <td className="p-3">{displayValue(total.hr)}</td>
+            <td className="p-3">{displayValue(total.hbp)}</td>
+            <td className="p-3">{displayValue(total.bb)}</td>
+            <td className="p-3">{displayValue(total.ibb)}</td>
+            <td className="p-3">{displayValue(total.k)}</td>
+            <td className="p-3">{displayValue(total.pitchCount)}</td>
 
             <td className="p-3">-</td>
 
             <td className="p-3">
               {formatDecimal(
                 safeDivide(
-                  total.bb + total.h,
-                  total.ipOuts / 3
+                  total.bb !== null && total.h !== null ? total.bb + total.h : null,
+                  total.ipOuts !== null ? total.ipOuts / 3 : null
                 )
               )}
             </td>

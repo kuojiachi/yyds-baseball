@@ -7,6 +7,8 @@ type PlayerOption = {
   id: string;
   name_zh: string;
   name_en?: string | null;
+  name_ja?: string | null;
+  name_ko?: string | null;
 };
 
 type SourceType =
@@ -15,6 +17,14 @@ type SourceType =
   | "latest_transactions"
   | "mlb_pipeline"
   | "fangraphs_scouting";
+
+type LeagueType = "MLB_MILB" | "NPB" | "KBO";
+
+const LEAGUE_OPTIONS: { value: LeagueType; label: string }[] = [
+  { value: "MLB_MILB", label: "MLB / MiLB" },
+  { value: "NPB", label: "日職 NPB" },
+  { value: "KBO", label: "韓職 KBO" },
+];
 
 const SOURCE_OPTIONS: { value: SourceType; label: string }[] = [
   { value: "season_stats", label: "Season Stats｜年度成績" },
@@ -43,18 +53,21 @@ export default function AdminSourcesPage() {
   const [statType, setStatType] = useState("batting");
   const [playerKeyword, setPlayerKeyword] = useState("");
   const [showPlayerList, setShowPlayerList] = useState(false);
+  const [leagueType, setLeagueType] = useState<LeagueType>("MLB_MILB");
+  const [selectedPlayerNameJa, setSelectedPlayerNameJa] = useState("");
 
   function resetPreview() {
     setPreview([]);
     setSeasonStatsPreview([]);
     setTransactionsPreview([]);
+    setGameLogsPreview([]);
   }
 
   useEffect(() => {
     async function loadPlayers() {
       const { data, error } = await supabase
         .from("players")
-        .select("id, name_zh, name_en")
+        .select("id, name_zh, name_en, name_ja, name_ko")
         .order("name_zh", { ascending: true });
 
       if (error) {
@@ -108,7 +121,17 @@ export default function AdminSourcesPage() {
         body: JSON.stringify({
           url: sourceInput,
           playerId,
+          players,
+          playerName:
+            players.find((player) => player.id === playerId)?.name_zh ?? "",
+          selectedPlayerNameJa:
+            selectedPlayerNameJa ||
+            players.find((player) => player.id === playerId)?.name_ja ||
+            "",
+          selectedPlayerNameKo:
+            players.find((player) => player.id === playerId)?.name_ko || "",
           teamName,
+          leagueType,
           level,
           seasonYear,
           sourceType,
@@ -288,6 +311,11 @@ export default function AdminSourcesPage() {
                   setShowPlayerList(true);
                 }}
                 onFocus={() => setShowPlayerList(true)}
+                onBlur={() => {
+                  setTimeout(() => {
+                    setShowPlayerList(false);
+                  }, 150);
+                }}
                 placeholder="搜尋中文名 / 英文名"
                 className="w-full rounded-xl border border-slate-700 bg-slate-800 p-3"
               />
@@ -301,6 +329,7 @@ export default function AdminSourcesPage() {
                         type="button"
                         onClick={() => {
                           setPlayerId(player.id);
+                          setSelectedPlayerNameJa(player.name_ja ?? "");
                           setPlayerKeyword(
                             `${player.name_zh}${player.name_en ? `｜${player.name_en}` : ""}`
                           );
@@ -334,6 +363,25 @@ export default function AdminSourcesPage() {
                 className="w-full rounded-xl border border-slate-700 bg-slate-800 p-3"
               >
                 {SOURCE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label>
+              <p className="mb-2 text-sm text-slate-400">聯盟來源</p>
+              <select
+                value={leagueType}
+                onChange={(event) => {
+                  setLeagueType(event.target.value as LeagueType);
+                  resetPreview();
+                  setMessage("");
+                }}
+                className="w-full rounded-xl border border-slate-700 bg-slate-800 p-3"
+              >
+                {LEAGUE_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>
@@ -389,6 +437,11 @@ export default function AdminSourcesPage() {
                 <option value="A">A</option>
                 <option value="ROK">ROK</option>
                 <option value="Minors">Minors</option>
+                <option value="日職一軍">日職一軍</option>
+                <option value="日職二軍">日職二軍</option>
+                <option value="日職三軍">日職三軍</option>
+                <option value="韓職一軍">韓職一軍</option>
+                <option value="韓職二軍">韓職二軍</option>
               </select>
             </label>
 

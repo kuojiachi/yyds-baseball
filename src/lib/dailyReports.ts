@@ -33,6 +33,7 @@ export async function getDailyReports() {
       hbp,
       sf,
       ip,
+      ip_outs,
       er,
       bf,
       pitch_count,
